@@ -1,0 +1,60 @@
+{
+  "name": "punto-venta-poblano",
+  "version": "1.0.0",
+  "description": "Punto de Venta de escritorio (Electron + React + SQLite)",
+  "main": "electron/main.js",
+  "author": "Punto Family",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "dev:vite": "vite",
+    "dev:electron": "cross-env NODE_ENV=development wait-on tcp:5173 && electron .",
+    "dev": "concurrently -k \"npm:dev:vite\" \"npm:dev:electron\"",
+    "build": "vite build",
+    "test": "cross-env ELECTRON_RUN_AS_NODE=1 electron --test electron/__tests__/",
+    "electron:build": "npm run build && electron-builder",
+    "release": "npm run build && electron-builder --publish always",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^11.10.0",
+    "electron-log": "^5.4.4",
+    "electron-updater": "^6.8.9",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "concurrently": "^9.0.1",
+    "cross-env": "^7.0.3",
+    "electron": "^32.1.2",
+    "electron-builder": "^25.0.5",
+    "vite": "^5.4.6",
+    "wait-on": "^8.0.0"
+  },
+  "build": {
+    "appId": "com.puntofamily.puntoventa",
+    "productName": "Punto Venta Poblano",
+    "directories": {
+      "output": "dist-installer"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "4DRIAN-G4RCI4",
+      "repo": "PuntoVenta"
+    }
+  }
+}

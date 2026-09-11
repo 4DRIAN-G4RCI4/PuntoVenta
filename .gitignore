@@ -1,0 +1,11 @@
+node_modules/
+dist/
+dist-installer/
+*.log
+.DS_Store
+Thumbs.db
+*.db
+*.db-wal
+*.db-shm
+.env
+.env.*
