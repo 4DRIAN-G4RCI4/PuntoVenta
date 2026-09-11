@@ -21,6 +21,7 @@ import Revision from './pages/Revision.jsx';
 import Tutoriales from './pages/Tutoriales.jsx';
 import AcercaDe from './pages/AcercaDe.jsx';
 import CorteCajaModal from './components/CorteCajaModal.jsx';
+import UpdateBanner from './components/UpdateBanner.jsx';
 import { useNegocio } from './hooks/useNegocio.js';
 import { TourProvider } from './tours/TourContext.jsx';
 import TourOverlay from './tours/TourOverlay.jsx';
@@ -195,6 +196,7 @@ export default function App() {
             </div>
           </div>
           <div className="content">
+            <UpdateBanner />
             {page === 'index' && <Dashboard />}
             {page === 'ventas' && <Ventas />}
             {page === 'historial_ventas' && <HistorialVentas />}

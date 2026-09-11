@@ -1092,7 +1092,10 @@ function register(mainWindow, actualizaciones = {}) {
   }));
 
   // ── ACTUALIZACIONES (GitHub Releases, ver "publish" en package.json) ──
-  ipcMain.handle('updates:estado', proteger(ROLES.ADMIN, () => ok(obtenerEstadoActualizacion ? obtenerEstadoActualizacion() : { fase: 'inactivo' })));
+  // Cualquier rol autenticado puede VER el estado y reiniciar para instalar
+  // (es información inofensiva y una acción que no expone datos del negocio) —
+  // así el aviso de "actualización lista" se puede mostrar a todos, no solo admin.
+  ipcMain.handle('updates:estado', proteger(ROLES.ANY, () => ok(obtenerEstadoActualizacion ? obtenerEstadoActualizacion() : { fase: 'inactivo' })));
 
   ipcMain.handle('updates:buscar', proteger(ROLES.ADMIN, () => {
     if (!buscarActualizaciones) return err('La búsqueda de actualizaciones no está disponible.');
@@ -1100,7 +1103,7 @@ function register(mainWindow, actualizaciones = {}) {
     return ok();
   }));
 
-  ipcMain.handle('updates:instalarYReiniciar', proteger(ROLES.ADMIN, () => {
+  ipcMain.handle('updates:instalarYReiniciar', proteger(ROLES.ANY, () => {
     if (!autoUpdater) return err('No disponible.');
     autoUpdater.quitAndInstall();
     return ok();
