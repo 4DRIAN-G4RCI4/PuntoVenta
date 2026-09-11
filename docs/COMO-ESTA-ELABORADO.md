@@ -128,7 +128,7 @@ El handler `ventas:procesar` es el corazón: valida tipo de venta, aplica promoc
 - **Dirección:** solo subida ("espejo resumido"); la app de escritorio es la dueña de los datos.
 - Cada cambio relevante (ventas, gastos, movimientos de stock, cortes, etc.) se **encola en `sync_queue`** con `operacion ∈ upsert|delete`.
 - Un proceso en segundo plano intenta subir los pendientes en lotes; si falla (sin internet), **reintenta** acumulando `intentos`/`ultimo_error` — jamás bloquea la operación local.
-- Configuración por `app_config` (`supabase_*`) + canales `sync:*` (admin). Existen SQL de apoyo en `docs/` (`supabase_schema.sql`, `supabase_policies_escritura.sql`, `supabase_reportes_extra.sql`) para montar el lado remoto.
+- Configuración por `app_config` (`supabase_*`) + canales `sync:*` (admin). Existen SQL de apoyo en `docs/supabase/` (`supabase_schema.sql`, `supabase_policies_escritura.sql`, `supabase_reportes_extra.sql`, `supabase_rename_presentacion.sql`) para montar el lado remoto.
 
 ## 8. Pruebas
 
@@ -164,36 +164,42 @@ Scripts (`package.json`):
 
 ```
 punto-venta-poblano/
-├── electron/
-│   ├── main.js            # ventana + seguridad
-│   ├── preload.js         # window.api.* (whitelist)
-│   ├── db.js              # bootstrap, migraciones, seed
-│   ├── schema.sql         # DDL + índices
-│   ├── ipcHandlers.js     # ~75 canales con roles y validación
-│   ├── logicaFarmacia.js  # FEFO / lotes / reconciliación
-│   ├── supabaseSync.js    # espejo opcional a Supabase
-│   ├── ticket.js          # HTML de ticket
-│   └── __tests__/         # pruebas node:test
-├── src/
+├── electron/                  # proceso principal (código que SÍ se empaqueta)
+│   ├── main.js                # ventana + seguridad + log + auto-updater
+│   ├── preload.js              # window.api.* (whitelist)
+│   ├── db.js                  # bootstrap, migraciones, seed
+│   ├── schema.sql             # DDL + índices
+│   ├── ipcHandlers.js         # ~75 canales con roles y validación
+│   ├── logicaFarmacia.js      # FEFO / lotes / reconciliación
+│   ├── supabaseSync.js        # espejo opcional a Supabase
+│   └── __tests__/             # pruebas node:test (npm test)
+├── src/                       # proceso de renderer (React)
 │   ├── App.jsx            # sesión, menú, SPA
-│   ├── pages/             # 22 vistas
+│   ├── pages/             # ~23 vistas
 │   ├── components/        # UI reutilizable (CorteCajaModal, etc.)
 │   ├── hooks/             # useNegocio, etc.
 │   ├── utils/             # CSV/PDF/ticket
 │   ├── tours/             # tours guiados
 │   └── theme.css
+├── scripts/                   # utilidades de mantenimiento — NO se empaquetan
+│   ├── seedTestData.js        # genera ~1000 ventas de prueba
+│   └── fixSeedRoles.js        # corrige datos de prueba mal atribuidos
 ├── docs/
 │   ├── CONTEXTO-Y-PROBLEMATICA.md
 │   ├── COMO-ESTA-ELABORADO.md
-│   └── supabase_*.sql     # lado remoto
+│   └── supabase/           # SQL para correr en el SQL Editor de Supabase
+├── build/                      # recursos de icono para electron-builder
 ├── vite.config.js / index.html   # build + CSP
 └── package.json
 ```
+
+`electron-builder` solo empaqueta `dist/**`, `electron/**` y `package.json` (ver `"files"` en `package.json`) — por eso `scripts/` y `docs/` viven fuera de `electron/`: son herramientas de desarrollo/soporte, no código que deba llegar a la máquina del cliente.
 
 ## 12. Deudas técnicas y mejoras sugeridas
 
 - Los totales se validan en el backend, pero conviene **ampliar cobertura de pruebas** a `ipcHandlers.js` (hoy las pruebas cubren la capa de farmacia y las migraciones).
 - `ROL_PERMISOS` existe duplicado (UI en `src/App.jsx` y lista en `ipcHandlers.js`); es una doble fuente de verdad: la fuente autoritativa de permisos de canales son las constantes `ROLES` usadas por `proteger()`.
 - El `ROLES`/permisos de UI no incluyen `gastos`/`reportes` para vendedor pese a que la lista `ROL_PERMISOS` de backend los menciona — los canales están efectivamente restringidos a ADMIN.
-- La exportación CSV no sanitiza el riesgo de **inyección de fórmulas** (conveniente anteponer `=`/`+`/`-`/`@` o comillas, o exportar JSON).
+- ~~La exportación CSV no sanitiza el riesgo de inyección de fórmulas~~ — resuelto: `src/utils/csv.js` antepone un apóstrofe a cualquier celda que empiece con `=`, `+`, `-`, `@`, tab o retorno de carro.
+- No hay reporte de errores/crashes remoto ni auto-actualización — resuelto: `electron-log` (ver Configuración → Soporte y Diagnóstico) y `electron-updater` contra GitHub Releases (ver Configuración → Actualizaciones, y el script `npm run release`).
 - Considerar `npm audit` / actualizaciones de dependencias y un lint automatizado (ESLint/Prettier) al pipeline.

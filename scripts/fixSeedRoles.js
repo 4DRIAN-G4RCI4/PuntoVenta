@@ -1,4 +1,4 @@
-// electron/fixSeedRoles.js — corrige datos de prueba mal generados:
+// scripts/fixSeedRoles.js — corrige datos de prueba mal generados:
 // reasigna ventas/gastos que quedaron atribuidos a usuarios con rol
 // "almacen" (que nunca deberían poder generar ventas ni gastos) hacia
 // usuarios admin/vendedor reales, para que Revisión de Actividad sea

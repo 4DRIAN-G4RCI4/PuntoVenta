@@ -12,6 +12,8 @@
     "dev": "concurrently -k \"npm:dev:vite\" \"npm:dev:electron\"",
     "build": "vite build",
     "test": "cross-env ELECTRON_RUN_AS_NODE=1 electron --test electron/__tests__/",
+    "seed:datos-prueba": "cross-env ELECTRON_RUN_AS_NODE=1 electron scripts/seedTestData.js",
+    "seed:corregir-roles": "cross-env ELECTRON_RUN_AS_NODE=1 electron scripts/fixSeedRoles.js",
     "electron:build": "npm run build && electron-builder",
     "release": "npm run build && electron-builder --publish always",
     "postinstall": "electron-builder install-app-deps"

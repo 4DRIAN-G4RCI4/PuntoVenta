@@ -1,5 +1,5 @@
-// electron/seedTestData.js — genera datos de prueba (~1000 ventas) en la BD real.
-// Ejecutar con: node_modules/electron/dist/electron.exe electron/seedTestData.js
+// scripts/seedTestData.js — genera datos de prueba (~1000 ventas) en la BD real.
+// Ejecutar con: node_modules/electron/dist/electron.exe scripts/seedTestData.js
 const path = require('path');
 const os = require('os');
 const Database = require('better-sqlite3');
