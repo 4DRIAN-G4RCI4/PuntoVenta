@@ -31,6 +31,7 @@ export default function Inventario() {
   const [lotes, setLotes] = useState([]);
   const [newLote, setNewLote] = useState({ numero_lote: '', fecha_caducidad: '', cantidad: '' });
   const [error, setError] = useState('');
+  const [erroresCampo, setErroresCampo] = useState({});
   const emptyForm = {
     id: 0, nombre: '', descripcion: '', categoria_id: '', departamento: '', marca: '', modelo: '', color: '', material: '', codigo_barras: '',
     costo_unitario: '', precio_publico: '', iva: 16,
@@ -52,7 +53,7 @@ export default function Inventario() {
   }
   useEffect(() => { load(); }, [dept]);
 
-  function openNew() { setForm({ ...emptyForm, departamento: dept, presentaciones: [{ presentacion: '', stock: 0 }] }); setError(''); setModalOpen(true); }
+  function openNew() { setForm({ ...emptyForm, departamento: dept, presentaciones: [{ presentacion: '', stock: 0 }] }); setError(''); setErroresCampo({}); setModalOpen(true); }
   function openEdit(p) {
     setForm({
       id: p.id, nombre: p.nombre, descripcion: p.descripcion || '', categoria_id: p.categoria_id || '', departamento: p.departamento || '',
@@ -63,6 +64,7 @@ export default function Inventario() {
       presentaciones: []
     });
     setError('');
+    setErroresCampo({});
     setModalOpen(true);
   }
 
@@ -73,16 +75,17 @@ export default function Inventario() {
   function removePresentacionRow(i) { setForm({ ...form, presentaciones: form.presentaciones.filter((_, idx) => idx !== i) }); }
 
   function validarForm() {
-    const faltantes = [];
-    if (!form.nombre.trim()) faltantes.push('El nombre del producto es requerido.');
-    if (!form.costo_unitario) faltantes.push('El costo unitario es requerido.');
-    if (!form.precio_publico) faltantes.push('El precio al público es requerido.');
-    return faltantes;
+    const errores = {};
+    if (!form.nombre.trim()) errores.nombre = 'El nombre del producto es requerido.';
+    if (!form.costo_unitario) errores.costo_unitario = 'El costo unitario es requerido.';
+    if (!form.precio_publico) errores.precio_publico = 'El precio al público es requerido.';
+    return errores;
   }
 
   async function save() {
-    const faltantes = validarForm();
-    if (faltantes.length) { setError(faltantes); return; }
+    const errores = validarForm();
+    if (Object.keys(errores).length) { setErroresCampo(errores); setError(''); return; }
+    setErroresCampo({});
     const payload = { ...form, departamento: form.departamento || dept, categoria_id: form.categoria_id ? Number(form.categoria_id) : null, costo_unitario: Number(form.costo_unitario), precio_publico: Number(form.precio_publico) };
     const res = await window.api.productos.save(payload);
     if (!res.ok) { setError(res.error); return; }
@@ -200,17 +203,16 @@ export default function Inventario() {
           <button className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancelar</button>
           <button className="btn btn-primary" onClick={save}>Guardar</button>
         </>}>
-        {!!error && (
-          <div className="alert alert-error">
-            {Array.isArray(error)
-              ? <ul style={{ margin: 0, paddingLeft: 18 }}>{error.map((e, i) => <li key={i}>{e}</li>)}</ul>
-              : error}
-          </div>
-        )}
+        {!!error && <div className="alert alert-error">{error}</div>}
         <div className="form-grid">
           <div className="form-group span-full">
             <label>Nombre del Producto *</label>
-            <input value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} />
+            <input
+              value={form.nombre}
+              onChange={(e) => { setForm({ ...form, nombre: e.target.value }); if (erroresCampo.nombre) setErroresCampo({ ...erroresCampo, nombre: undefined }); }}
+              style={erroresCampo.nombre ? { borderColor: 'var(--red)' } : undefined}
+            />
+            {erroresCampo.nombre && <div style={{ color: 'var(--red)', fontSize: 11, marginTop: 4 }}>{erroresCampo.nombre}</div>}
           </div>
           <div className="form-group">
             <label>Categoría</label>
@@ -225,8 +227,24 @@ export default function Inventario() {
           <div className="form-group"><label>Color</label><input value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} /></div>
           <div className="form-group"><label>Material</label><input value={form.material} onChange={(e) => setForm({ ...form, material: e.target.value })} /></div>
           <div className="form-group"><label>Código de barras</label><input value={form.codigo_barras} onChange={(e) => setForm({ ...form, codigo_barras: e.target.value })} /></div>
-          <div className="form-group"><label>Costo Unitario ($) *</label><input type="number" step="0.01" value={form.costo_unitario} onChange={(e) => setForm({ ...form, costo_unitario: e.target.value })} /></div>
-          <div className="form-group"><label>Precio al Público ($) *</label><input type="number" step="0.01" value={form.precio_publico} onChange={(e) => setForm({ ...form, precio_publico: e.target.value })} /></div>
+          <div className="form-group">
+            <label>Costo Unitario ($) *</label>
+            <input
+              type="number" step="0.01" value={form.costo_unitario}
+              onChange={(e) => { setForm({ ...form, costo_unitario: e.target.value }); if (erroresCampo.costo_unitario) setErroresCampo({ ...erroresCampo, costo_unitario: undefined }); }}
+              style={erroresCampo.costo_unitario ? { borderColor: 'var(--red)' } : undefined}
+            />
+            {erroresCampo.costo_unitario && <div style={{ color: 'var(--red)', fontSize: 11, marginTop: 4 }}>{erroresCampo.costo_unitario}</div>}
+          </div>
+          <div className="form-group">
+            <label>Precio al Público ($) *</label>
+            <input
+              type="number" step="0.01" value={form.precio_publico}
+              onChange={(e) => { setForm({ ...form, precio_publico: e.target.value }); if (erroresCampo.precio_publico) setErroresCampo({ ...erroresCampo, precio_publico: undefined }); }}
+              style={erroresCampo.precio_publico ? { borderColor: 'var(--red)' } : undefined}
+            />
+            {erroresCampo.precio_publico && <div style={{ color: 'var(--red)', fontSize: 11, marginTop: 4 }}>{erroresCampo.precio_publico}</div>}
+          </div>
           <div className="form-group">
             <label>IVA</label>
             <select value={form.iva} onChange={(e) => setForm({ ...form, iva: Number(e.target.value) })}>
