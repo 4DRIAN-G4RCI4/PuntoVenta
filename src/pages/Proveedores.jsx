@@ -33,10 +33,10 @@ export default function Proveedores() {
     <div>
       <div className="toolbar">
         <h2 style={{ flex: 1 }}>Proveedores</h2>
-        <button className="btn btn-primary" onClick={openNew}>+ Nuevo Proveedor</button>
+        <button data-tour="prov-nuevo" className="btn btn-primary" onClick={openNew}>+ Nuevo Proveedor</button>
       </div>
 
-      <div className="card" style={{ padding: 0 }}>
+      <div className="card" style={{ padding: 0 }} data-tour="prov-tabla">
         <div className="table-wrap">
           <table>
             <thead><tr><th>Nombre</th><th>Contacto</th><th>Teléfono</th><th>Email</th><th>Estado</th><th>Acciones</th></tr></thead>

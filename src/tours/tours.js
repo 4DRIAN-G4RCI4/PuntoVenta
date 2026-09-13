@@ -312,6 +312,59 @@ export const TOURS = {
   },
 
   // ══════════════════════════════════════════════════════════════
+  // FARMACIA Y PRODUCTOS REGULADOS
+  // ══════════════════════════════════════════════════════════════
+  farmacia_lotes_caducidad: {
+    titulo: 'Farmacia: Lotes y Caducidad',
+    rol: ['admin', 'almacen'],
+    steps: [
+      { titulo: 'Vender medicamentos sin arriesgarte a vender algo caducado', texto: 'Si tu negocio maneja medicamentos u otros productos perecederos, esta app puede llevar el control de lote y fecha de caducidad de cada presentación — y bloquear la venta si lo único que queda ya caducó.' },
+      { page: 'inventario', selector: '[data-tour="inv-nuevo"]', titulo: 'Empieza en Inventario', texto: 'Al crear o editar un producto, baja hasta la sección "Datos regulados".' },
+      { page: 'inventario', selector: '[data-tour="inv-datos-regulados"]', titulo: 'Datos del medicamento', texto: 'Aquí capturas principio activo, laboratorio, forma farmacéutica y registro sanitario (COFEPRIS) — todo opcional, pero útil para identificar bien el producto.' },
+      { page: 'inventario', selector: '[data-tour="inv-checks-farmacia"]', titulo: 'La casilla clave: "Maneja lotes y caducidad"', texto: 'Actívala en cualquier medicamento. Una vez guardado el producto, su stock ya NO se captura como número suelto — siempre entra por un lote con su propia fecha de caducidad.' },
+      { titulo: 'Capturar un lote', texto: 'En la tabla de Inventario, haz clic en el botón de presentaciones (ej. "2 pres. (30 u)") de ese producto, y luego en "Ver lotes" de la presentación que quieras. Ahí agregas número de lote, fecha de caducidad y cantidad.' },
+      { titulo: 'FEFO: primero el que antes caduca', texto: 'Cuando alguien vende ese producto en el Punto de Venta, el sistema descuenta automáticamente del lote que caduca más pronto — sin que el vendedor tenga que elegir nada. Así nunca se queda estancado el lote viejo mientras se vende el nuevo.' },
+      { titulo: 'El semáforo de caducidad', texto: 'En "Ver lotes" cada fila se pinta de color: verde (vigente), naranja (caduca en 30 días o menos), rojo (ya caducado). Un lote rojo NO se puede vender — el sistema lo rechaza aunque tenga piezas.' },
+      { titulo: '¡Listo!', texto: 'Revisa el Dashboard y el reporte de Caducidades seguido para dar de baja o vender primero lo que está por vencer.' }
+    ]
+  },
+
+  farmacia_receta_sustancia: {
+    titulo: 'Farmacia: Receta Médica y Sustancias Controladas',
+    rol: ['admin', 'vendedor'],
+    steps: [
+      { titulo: 'Control al momento de cobrar', texto: 'Algunos medicamentos legalmente requieren receta, y las sustancias controladas requieren identificar a quien las compra. La app exige estos datos antes de dejar cobrar — no depende de que el vendedor se acuerde.' },
+      { titulo: '¿Cómo se activa?', texto: 'El administrador marca "Requiere receta médica" y/o "Sustancia controlada" en ese producto, desde Inventario → Datos regulados.' },
+      { page: 'ventas', selector: '[data-tour="ventas-carrito"]', titulo: 'En el carrito aparece el campo obligatorio', texto: 'En cuanto agregas al carrito un producto marcado así, sale un campo extra debajo de esa línea: folio de receta, o nombre e identificación del comprador, según el caso.' },
+      { page: 'ventas', selector: '[data-tour="ventas-cobrar"]', titulo: 'No deja cobrar sin llenarlo', texto: 'El botón "COBRAR" se bloquea y aparece una alerta roja si falta ese dato en cualquier producto del carrito — es un candado real, no solo un recordatorio visual.' },
+      { titulo: '¡Listo!', texto: 'Esto queda guardado junto con la venta, como respaldo por si necesitas comprobarlo después.' }
+    ]
+  },
+
+  farmacia_proveedores: {
+    titulo: 'Farmacia: Proveedores',
+    rol: ['admin', 'almacen'],
+    steps: [
+      { titulo: 'Lleva el control de a quién le compras', texto: 'Útil para saber de qué distribuidora viene cada medicamento — importante si algún día hay que rastrear un lote hasta su origen.' },
+      { page: 'proveedores', selector: '[data-tour="nav-proveedores"]', titulo: 'Sección Proveedores', texto: 'Aquí das de alta cada distribuidora o laboratorio con el que trabajas.' },
+      { page: 'proveedores', selector: '[data-tour="prov-nuevo"]', titulo: 'Botón "+ Nuevo Proveedor"', texto: 'Capturas nombre, persona de contacto, teléfono, correo y notas.' },
+      { page: 'proveedores', selector: '[data-tour="prov-tabla"]', titulo: 'Así se ve en la lista', texto: 'Puedes editarlo, desactivarlo (si dejas de comprarle pero no quieres perder el historial), o eliminarlo si nunca se usó.' },
+      { titulo: '¡Listo!', texto: 'Aunque hoy no esté ligado directamente a cada compra, tenerlos registrados deja tu operación lista para cuando lo necesites.' }
+    ]
+  },
+
+  farmacia_reporte_caducidades: {
+    titulo: 'Farmacia: Reporte de Caducidades',
+    rol: 'admin',
+    steps: [
+      { titulo: 'Un reporte dedicado solo a esto', texto: 'Además del aviso rápido en el Dashboard, existe un reporte completo — igual de exportable que los demás — enfocado en lo que ya caducó o está por caducar.' },
+      { page: 'reportes', selector: '[data-tour="reportes-tabs"]', titulo: 'Pestaña "Caducidades"', texto: 'Muestra cada lote caducado o próximo a caducar (30 días), con producto, presentación, número de lote, cantidad y fecha.' },
+      { page: 'reportes', selector: '[data-tour="reportes-exportar"]', titulo: 'Exportar', texto: 'Igual que los otros 7 reportes, lo puedes exportar a CSV o PDF — útil para llevarlo a una junta o dejárselo al encargado de compras.' },
+      { titulo: '¡Listo!', texto: 'Revísalo periódicamente (semanal es un buen ritmo) para no dejar que nada llegue a caducar sin haberlo vendido o dado de baja a tiempo.' }
+    ]
+  },
+
+  // ══════════════════════════════════════════════════════════════
   // COMUNES A TODOS LOS ROLES
   // ══════════════════════════════════════════════════════════════
   dashboard_explicado: {

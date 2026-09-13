@@ -30,8 +30,17 @@ const ICONOS = {
   almacen_devoluciones: '↺',
   dashboard_explicado: '▦',
   perfil_mi_cuenta: '☺',
-  aplicar_promocion_venta: '★'
+  aplicar_promocion_venta: '★',
+  farmacia_lotes_caducidad: '⚕',
+  farmacia_receta_sustancia: '℞',
+  farmacia_proveedores: '⚑',
+  farmacia_reporte_caducidades: '☷'
 };
+
+// Tutoriales exclusivos para negocios que manejan medicamentos u otros
+// productos regulados (lotes/caducidad, receta, sustancias controladas) —
+// se muestran en su propia sección, separados de los tutoriales generales.
+const IDS_FARMACIA = ['farmacia_lotes_caducidad', 'farmacia_receta_sustancia', 'farmacia_proveedores', 'farmacia_reporte_caducidades'];
 
 const DESCRIPCIONES = {
   admin_general: 'Un recorrido por todo el panel de administrador: dashboard, ventas, inventario, usuarios, reportes y configuración.',
@@ -60,13 +69,36 @@ const DESCRIPCIONES = {
   almacen_devoluciones: 'Cómo buscar una venta y registrar la devolución de productos.',
   dashboard_explicado: 'Qué significa cada tarjeta y cada gráfica de tu Dashboard, al detalle.',
   perfil_mi_cuenta: 'Cómo actualizar tu información personal y cambiar tu contraseña.',
-  aplicar_promocion_venta: 'Cómo aplicar un descuento manual o una promoción durante una venta.'
+  aplicar_promocion_venta: 'Cómo aplicar un descuento manual o una promoción durante una venta.',
+  farmacia_lotes_caducidad: 'Cómo activar el control de lotes en un medicamento y por qué el sistema vende primero lo que antes caduca (FEFO).',
+  farmacia_receta_sustancia: 'Cómo la app exige folio de receta o identificación del comprador antes de dejar cobrar ciertos productos.',
+  farmacia_proveedores: 'Cómo dar de alta a tus distribuidoras y laboratorios.',
+  farmacia_reporte_caducidades: 'Cómo generar y exportar el reporte dedicado a lotes caducados o próximos a caducar.'
 };
+
+function GrupoTutoriales({ tours, startTour, vacioTexto }) {
+  return (
+    <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}>
+      {tours.map((t) => (
+        <div key={t.id} className="card" style={{ margin: 0, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ fontSize: 26, marginBottom: 6 }}>{ICONOS[t.id] || '◎'}</div>
+          <div style={{ fontWeight: 700, marginBottom: 6 }}>{t.titulo}</div>
+          <div style={{ color: 'var(--muted)', fontSize: 12, flex: 1, marginBottom: 14 }}>{DESCRIPCIONES[t.id]}</div>
+          <div style={{ color: 'var(--muted)', fontSize: 11, marginBottom: 10 }}>{t.steps.length} pasos</div>
+          <button className="btn btn-primary btn-sm" onClick={() => startTour(t.id)}>Iniciar tutorial</button>
+        </div>
+      ))}
+      {!tours.length && <p style={{ color: 'var(--muted)' }}>{vacioTexto}</p>}
+    </div>
+  );
+}
 
 export default function Tutoriales() {
   const { user } = useAuth();
   const { startTour } = useTourCtx();
-  const tours = toursParaRol(user.rol);
+  const todos = toursParaRol(user.rol);
+  const tours = todos.filter((t) => !IDS_FARMACIA.includes(t.id));
+  const toursFarmacia = todos.filter((t) => IDS_FARMACIA.includes(t.id));
 
   return (
     <div>
@@ -75,18 +107,19 @@ export default function Tutoriales() {
         Recorridos guiados para tu rol ({user.rol}). Cada paso te señala en pantalla qué botón usar y para qué sirve. Los tutoriales de tareas específicas crean un registro de prueba y lo eliminan automáticamente al terminar.
       </p>
 
-      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}>
-        {tours.map((t) => (
-          <div key={t.id} className="card" style={{ margin: 0, display: 'flex', flexDirection: 'column' }}>
-            <div style={{ fontSize: 26, marginBottom: 6 }}>{ICONOS[t.id] || '◎'}</div>
-            <div style={{ fontWeight: 700, marginBottom: 6 }}>{t.titulo}</div>
-            <div style={{ color: 'var(--muted)', fontSize: 12, flex: 1, marginBottom: 14 }}>{DESCRIPCIONES[t.id]}</div>
-            <div style={{ color: 'var(--muted)', fontSize: 11, marginBottom: 10 }}>{t.steps.length} pasos</div>
-            <button className="btn btn-primary btn-sm" onClick={() => startTour(t.id)}>Iniciar tutorial</button>
-          </div>
-        ))}
-        {!tours.length && <p style={{ color: 'var(--muted)' }}>No hay tutoriales disponibles para tu rol todavía.</p>}
-      </div>
+      <GrupoTutoriales tours={tours} startTour={startTour} vacioTexto="No hay tutoriales disponibles para tu rol todavía." />
+
+      {!!toursFarmacia.length && (
+        <>
+          <h3 style={{ margin: '28px 0 4px', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span>⚕</span> Farmacia y Productos Regulados
+          </h3>
+          <p style={{ color: 'var(--muted)', fontSize: 13, marginBottom: 20 }}>
+            Solo relevantes si tu negocio vende medicamentos u otros productos que requieren control de lote, caducidad, receta o identificación del comprador.
+          </p>
+          <GrupoTutoriales tours={toursFarmacia} startTour={startTour} vacioTexto="Sin tutoriales de farmacia para tu rol." />
+        </>
+      )}
     </div>
   );
 }

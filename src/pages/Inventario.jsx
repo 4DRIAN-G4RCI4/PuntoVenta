@@ -223,7 +223,7 @@ export default function Inventario() {
           <div className="form-group span-full"><label>Descripción</label><textarea rows={2} value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} /></div>
         </div>
 
-        <div style={{ marginTop: 6, marginBottom: 16 }}>
+        <div style={{ marginTop: 6, marginBottom: 16 }} data-tour="inv-datos-regulados">
           <div className="card-title" style={{ fontSize: 13 }}>Datos regulados (medicamentos y similares — opcional)</div>
           <div className="form-grid">
             <div className="form-group"><label>Principio activo</label><input value={form.principio_activo} onChange={(e) => setForm({ ...form, principio_activo: e.target.value })} placeholder="Ej. Paracetamol" /></div>
@@ -231,7 +231,7 @@ export default function Inventario() {
             <div className="form-group"><label>Forma farmacéutica</label><input value={form.forma_farmaceutica} onChange={(e) => setForm({ ...form, forma_farmaceutica: e.target.value })} placeholder="Tableta, jarabe, cápsula..." /></div>
             <div className="form-group"><label>Registro sanitario (COFEPRIS)</label><input value={form.registro_sanitario} onChange={(e) => setForm({ ...form, registro_sanitario: e.target.value })} /></div>
           </div>
-          <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginTop: 8 }}>
+          <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginTop: 8 }} data-tour="inv-checks-farmacia">
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, textTransform: 'none', fontSize: 12, fontWeight: 400, cursor: 'pointer' }}>
               <input type="checkbox" style={{ width: 'auto' }} checked={form.requiere_receta} onChange={(e) => setForm({ ...form, requiere_receta: e.target.checked })} />
               Requiere receta médica
