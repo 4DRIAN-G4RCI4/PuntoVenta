@@ -72,9 +72,17 @@ export default function Inventario() {
   }
   function removePresentacionRow(i) { setForm({ ...form, presentaciones: form.presentaciones.filter((_, idx) => idx !== i) }); }
 
+  function validarForm() {
+    const faltantes = [];
+    if (!form.nombre.trim()) faltantes.push('El nombre del producto es requerido.');
+    if (!form.costo_unitario) faltantes.push('El costo unitario es requerido.');
+    if (!form.precio_publico) faltantes.push('El precio al público es requerido.');
+    return faltantes;
+  }
+
   async function save() {
-    if (!form.nombre.trim()) { setError('El nombre es requerido.'); return; }
-    if (!form.costo_unitario || !form.precio_publico) { setError('Costo y precio son requeridos.'); return; }
+    const faltantes = validarForm();
+    if (faltantes.length) { setError(faltantes); return; }
     const payload = { ...form, departamento: form.departamento || dept, categoria_id: form.categoria_id ? Number(form.categoria_id) : null, costo_unitario: Number(form.costo_unitario), precio_publico: Number(form.precio_publico) };
     const res = await window.api.productos.save(payload);
     if (!res.ok) { setError(res.error); return; }
@@ -192,7 +200,13 @@ export default function Inventario() {
           <button className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancelar</button>
           <button className="btn btn-primary" onClick={save}>Guardar</button>
         </>}>
-        {error && <div className="alert alert-error">{error}</div>}
+        {!!error && (
+          <div className="alert alert-error">
+            {Array.isArray(error)
+              ? <ul style={{ margin: 0, paddingLeft: 18 }}>{error.map((e, i) => <li key={i}>{e}</li>)}</ul>
+              : error}
+          </div>
+        )}
         <div className="form-grid">
           <div className="form-group span-full">
             <label>Nombre del Producto *</label>
