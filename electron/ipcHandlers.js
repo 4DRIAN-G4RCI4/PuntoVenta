@@ -997,6 +997,8 @@ function register(mainWindow, actualizaciones = {}) {
     const utilidad_neta = utilidad_bruta - gastos_total;
     const por_dept = db().prepare(`SELECT p.departamento, SUM(vd.cantidad) as unidades, SUM(vd.subtotal) as total, SUM(vd.costo_unitario*vd.cantidad) as costo, SUM(vd.subtotal)-SUM(vd.costo_unitario*vd.cantidad) as utilidad
       FROM ventas_detalle vd JOIN productos p ON p.id=vd.producto_id JOIN ventas v ON v.id=vd.venta_id WHERE date(v.created_at) BETWEEN ? AND ? AND v.estado!='cancelada' GROUP BY p.departamento`).all(fi, ff);
+    const por_forma_pago = db().prepare(`SELECT forma_pago, COUNT(*) as num, SUM(total) as total
+      FROM ventas WHERE date(created_at) BETWEEN ? AND ? AND estado!='cancelada' GROUP BY forma_pago`).all(fi, ff);
     const por_dia = db().prepare(`SELECT date(v.created_at) as dia, SUM(v.total) as total, COUNT(*) as num, SUM(COALESCE(c.costo,0)) as costo, SUM(v.total)-SUM(COALESCE(c.costo,0)) as utilidad
       FROM ventas v
       LEFT JOIN (SELECT vd.venta_id, SUM(vd.costo_unitario*vd.cantidad) as costo FROM ventas_detalle vd GROUP BY vd.venta_id) c ON c.venta_id=v.id
@@ -1023,7 +1025,7 @@ function register(mainWindow, actualizaciones = {}) {
       ORDER BY qty ASC, p.nombre ASC
     `).all(fi, ff);
     const clientes_deuda = db().prepare(`SELECT nombre, apellido, telefono, saldo_deuda FROM clientes WHERE saldo_deuda>0 AND activo=1 ORDER BY saldo_deuda DESC LIMIT 20`).all();
-    return ok({ ventas_total, costo_ventas, utilidad_bruta, gastos_total, utilidad_neta, por_dept, por_dia, top_prods, menos_vendidos, clientes_deuda });
+    return ok({ ventas_total, costo_ventas, utilidad_bruta, gastos_total, utilidad_neta, por_dept, por_forma_pago, por_dia, top_prods, menos_vendidos, clientes_deuda });
   }));
 
   // ── CONFIGURACIÓN: IDENTIDAD DEL NEGOCIO (nombre + logo/ícono) ──

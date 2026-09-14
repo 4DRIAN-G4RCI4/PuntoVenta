@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { money, dateFmt, todayISO, firstDayOfMonthISO } from '../format.js';
-import { GroupedBarChart, DonutChart } from '../components/Charts.jsx';
+import { GroupedBarChart, DonutChart, LineChart, HorizontalBarChart } from '../components/Charts.jsx';
 
 const PERIODOS = [
   { key: 'dia', label: 'Día' },
@@ -109,7 +109,9 @@ export default function Dashboard() {
   const [caducidades, setCaducidades] = useState({ caducados: [], porCaducar: [] });
 
   const invGanancia = usePeriodoReporte('mes');
+  const tendencia = usePeriodoReporte('mes');
   const categoriaTop = usePeriodoReporte('mes');
+  const formaPago = usePeriodoReporte('mes');
   const porDepto = usePeriodoReporte('mes');
   const topProductos = usePeriodoReporte('mes');
 
@@ -148,12 +150,26 @@ export default function Dashboard() {
     { name: 'Ganancia (utilidad)', data: agrupado.map((r) => r.utilidad) },
   ];
 
+  const agrupadoTendencia = useMemo(
+    () => agruparPorDia(tendencia.reporte?.por_dia, tendencia.periodo),
+    [tendencia.reporte, tendencia.periodo]
+  );
+  const labelsTendencia = agrupadoTendencia.map((r) => etiquetaPeriodo(r.dia, tendencia.periodo));
+  const serieTendencia = [{ name: 'Ventas totales', data: agrupadoTendencia.map((r) => r.total) }];
+
   const categorias = useMemo(() => (
     (categoriaTop.reporte?.por_dept || [])
       .map((d) => ({ label: d.departamento || 'Sin depto.', value: Math.max(0, d.utilidad || 0) }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 8)
   ), [categoriaTop.reporte]);
+
+  const NOMBRES_FORMA_PAGO = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', transferencia: 'Transferencia', mixto: 'Mixto' };
+  const porFormaPago = useMemo(() => (
+    (formaPago.reporte?.por_forma_pago || [])
+      .map((f) => ({ label: NOMBRES_FORMA_PAGO[f.forma_pago] || f.forma_pago, value: f.total }))
+      .sort((a, b) => b.value - a.value)
+  ), [formaPago.reporte]);
 
   if (loading) return <p style={{ color: 'var(--muted)' }}>Cargando dashboard...</p>;
 
@@ -225,6 +241,17 @@ export default function Dashboard() {
       </ChartCard>
 
       <ChartCard
+        titulo="Tendencia de Ventas"
+        periodo={tendencia.periodo}
+        onChangePeriodo={tendencia.setPeriodo}
+        fetching={tendencia.fetching}
+        vacio={!agrupadoTendencia.length}
+        dataTour="dash-chart-tendencia"
+      >
+        <LineChart series={serieTendencia} labels={labelsTendencia} />
+      </ChartCard>
+
+      <ChartCard
         titulo="Categoría con Más Ganancia"
         periodo={categoriaTop.periodo}
         onChangePeriodo={categoriaTop.setPeriodo}
@@ -233,6 +260,17 @@ export default function Dashboard() {
         dataTour="dash-chart-categoria"
       >
         <DonutChart data={categorias} />
+      </ChartCard>
+
+      <ChartCard
+        titulo="Ventas por Forma de Pago"
+        periodo={formaPago.periodo}
+        onChangePeriodo={formaPago.setPeriodo}
+        fetching={formaPago.fetching}
+        vacio={!porFormaPago.length}
+        dataTour="dash-chart-formapago"
+      >
+        <DonutChart data={porFormaPago} />
       </ChartCard>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
@@ -245,12 +283,13 @@ export default function Dashboard() {
           mensajeVacio="Sin ventas en este periodo."
           dataTour="dash-departamento"
         >
-          {porDepto.reporte?.por_dept?.map((d, i) => (
-            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid var(--border)' }}>
-              <span style={{ textTransform: 'capitalize' }}>{d.departamento || 'Sin depto.'}</span>
-              <strong>{money(d.total)}</strong>
-            </div>
-          ))}
+          <HorizontalBarChart
+            mostrarPct
+            data={(porDepto.reporte?.por_dept || [])
+              .map((d) => ({ label: d.departamento || 'Sin depto.', value: d.total }))
+              .sort((a, b) => b.value - a.value)
+              .slice(0, 8)}
+          />
         </ChartCard>
         <ChartCard
           titulo="Top Productos"
@@ -260,12 +299,11 @@ export default function Dashboard() {
           vacio={!topProductos.reporte?.top_prods?.length}
           dataTour="dash-topproductos"
         >
-          {topProductos.reporte?.top_prods?.slice(0, 6).map((p, i) => (
-            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid var(--border)' }}>
-              <span>{p.nombre} <span className="badge">{p.qty}u</span></span>
-              <strong>{money(p.total)}</strong>
-            </div>
-          ))}
+          <HorizontalBarChart
+            data={(topProductos.reporte?.top_prods || [])
+              .slice(0, 6)
+              .map((p) => ({ label: `${p.nombre} (${p.qty}u)`, value: p.total }))}
+          />
         </ChartCard>
       </div>
 

@@ -415,3 +415,44 @@ tr:hover td { background: var(--surface2); }
   margin: 0 auto;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Animaciones de gráficas del Dashboard ──────────────────────── */
+.pv-chart-bar {
+  transform-box: fill-box;
+  transform-origin: bottom;
+  animation: pv-bar-grow .55s cubic-bezier(.22, 1, .36, 1) backwards;
+}
+@keyframes pv-bar-grow {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+
+.pv-chart-arc {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pv-arc-in .5s cubic-bezier(.22, 1, .36, 1) backwards;
+}
+@keyframes pv-arc-in {
+  from { opacity: 0; transform: scale(.6); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.pv-chart-line {
+  animation: pv-line-draw 1s cubic-bezier(.22, 1, .36, 1) forwards;
+}
+@keyframes pv-line-draw {
+  to { stroke-dashoffset: 0; }
+}
+.pv-chart-dot {
+  animation: pv-arc-in .35s cubic-bezier(.22, 1, .36, 1) backwards;
+}
+
+.pv-hbar-track { overflow: hidden; }
+.pv-hbar-fill {
+  animation: pv-hbar-grow .6s cubic-bezier(.22, 1, .36, 1) backwards;
+  transform-origin: left;
+}
+@keyframes pv-hbar-grow {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
