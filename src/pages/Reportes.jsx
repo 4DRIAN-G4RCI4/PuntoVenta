@@ -48,6 +48,10 @@ export default function Reportes() {
   const [gastos, setGastos] = useState([]);
   const [creditos, setCreditos] = useState(null);
   const [devoluciones, setDevoluciones] = useState([]);
+  const [filtroDeptoMV, setFiltroDeptoMV] = useState('');
+  const [filtroCategoriaMV, setFiltroCategoriaMV] = useState('');
+  const [stockMinMV, setStockMinMV] = useState('');
+  const [stockMaxMV, setStockMaxMV] = useState('');
   const [caducidades, setCaducidades] = useState({ caducados: [], porCaducar: [] });
 
   function setPeriodo(p) {
@@ -89,6 +93,17 @@ export default function Reportes() {
     }
     setLoading(false);
   }
+
+  const menosVendidos = financiero?.menos_vendidos || [];
+  const deptosMV = useMemo(() => [...new Set(menosVendidos.map((p) => p.departamento).filter(Boolean))].sort(), [menosVendidos]);
+  const categoriasMV = useMemo(() => [...new Set(menosVendidos.map((p) => p.categoria).filter(Boolean))].sort(), [menosVendidos]);
+  const menosVendidosFiltrados = useMemo(() => menosVendidos.filter((p) => {
+    if (filtroDeptoMV && p.departamento !== filtroDeptoMV) return false;
+    if (filtroCategoriaMV && p.categoria !== filtroCategoriaMV) return false;
+    if (stockMinMV !== '' && p.stock_total < Number(stockMinMV)) return false;
+    if (stockMaxMV !== '' && p.stock_total > Number(stockMaxMV)) return false;
+    return true;
+  }), [menosVendidos, filtroDeptoMV, filtroCategoriaMV, stockMinMV, stockMaxMV]);
 
   const inventarioResumen = useMemo(() => {
     const valorCosto = inventario.reduce((s, i) => s + (i.costo_unitario || 0) * (i.stock_sistema || 0), 0);
@@ -328,6 +343,54 @@ export default function Reportes() {
                 {financiero.clientes_deuda.map((c, i) => <tr key={i}><td>{c.nombre} {c.apellido}</td><td style={{ color: 'var(--muted)' }}>{c.telefono}</td><td style={{ color: 'var(--red)', fontWeight: 700 }}>{money(c.saldo_deuda)}</td></tr>)}
               </tbody>
             </table>
+          </div>
+
+          <div className="card">
+            <div className="card-title">Productos Menos Vendidos</div>
+            <p style={{ color: 'var(--muted)', fontSize: 12, marginBottom: 14 }}>
+              Incluye productos sin ninguna venta en el periodo elegido arriba. Filtra por departamento, categoría o cantidad de stock para encontrar qué te conviene promocionar, descontinuar o dejar de reabastecer.
+            </p>
+            <div className="toolbar" style={{ marginBottom: 14 }}>
+              <select value={filtroDeptoMV} onChange={(e) => setFiltroDeptoMV(e.target.value)} style={{ width: 'auto' }}>
+                <option value="">Todos los departamentos</option>
+                {deptosMV.map((d) => <option key={d} value={d}>{d}</option>)}
+              </select>
+              <select value={filtroCategoriaMV} onChange={(e) => setFiltroCategoriaMV(e.target.value)} style={{ width: 'auto' }}>
+                <option value="">Todas las categorías</option>
+                {categoriasMV.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <input type="number" placeholder="Stock mín." value={stockMinMV} onChange={(e) => setStockMinMV(e.target.value)} style={{ width: 110 }} />
+              <input type="number" placeholder="Stock máx." value={stockMaxMV} onChange={(e) => setStockMaxMV(e.target.value)} style={{ width: 110 }} />
+              {(filtroDeptoMV || filtroCategoriaMV || stockMinMV !== '' || stockMaxMV !== '') && (
+                <button className="btn btn-ghost btn-sm" onClick={() => { setFiltroDeptoMV(''); setFiltroCategoriaMV(''); setStockMinMV(''); setStockMaxMV(''); }}>
+                  Limpiar filtros
+                </button>
+              )}
+              <div style={{ flex: 1 }} />
+              <span style={{ color: 'var(--muted)', fontSize: 12 }}>{menosVendidosFiltrados.length} de {menosVendidos.length} producto(s)</span>
+            </div>
+            <div className="table-wrap">
+              <table>
+                <thead><tr><th>SKU</th><th>Producto</th><th>Departamento</th><th>Categoría</th><th>Stock</th><th>Unidades Vendidas</th><th>Total Vendido</th></tr></thead>
+                <tbody>
+                  {menosVendidosFiltrados.slice(0, 50).map((p) => (
+                    <tr key={p.id}>
+                      <td><code>{p.sku}</code></td>
+                      <td>{p.nombre}</td>
+                      <td style={{ textTransform: 'capitalize', color: 'var(--muted)' }}>{p.departamento || '—'}</td>
+                      <td style={{ color: 'var(--muted)' }}>{p.categoria || '—'}</td>
+                      <td style={{ color: p.stock_total === 0 ? 'var(--red)' : 'var(--text)' }}>{p.stock_total}</td>
+                      <td style={{ color: p.qty === 0 ? 'var(--red)' : 'var(--text)', fontWeight: p.qty === 0 ? 700 : 400 }}>{p.qty}</td>
+                      <td>{money(p.total)}</td>
+                    </tr>
+                  ))}
+                  {!menosVendidosFiltrados.length && <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--muted)' }}>Ningún producto coincide con estos filtros.</td></tr>}
+                </tbody>
+              </table>
+              {menosVendidosFiltrados.length > 50 && (
+                <p style={{ color: 'var(--muted)', fontSize: 11, marginTop: 8 }}>Mostrando los primeros 50 de {menosVendidosFiltrados.length} — ajusta los filtros para acotar la lista.</p>
+              )}
+            </div>
           </div>
         </>
       )}

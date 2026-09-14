@@ -1003,8 +1003,27 @@ function register(mainWindow, actualizaciones = {}) {
       WHERE date(v.created_at) BETWEEN ? AND ? AND v.estado!='cancelada' GROUP BY dia ORDER BY dia`).all(fi, ff);
     const top_prods = db().prepare(`SELECT p.nombre, p.departamento, SUM(vd.cantidad) as qty, SUM(vd.subtotal) as total, SUM(vd.subtotal)-SUM(vd.costo_unitario*vd.cantidad) as utilidad
       FROM ventas_detalle vd JOIN productos p ON p.id=vd.producto_id JOIN ventas v ON v.id=vd.venta_id WHERE date(v.created_at) BETWEEN ? AND ? AND v.estado!='cancelada' GROUP BY p.id ORDER BY qty DESC LIMIT 10`).all(fi, ff);
+    // Todos los productos activos, con sus unidades vendidas en el periodo (0 si
+    // no tuvo ninguna venta) y su stock actual — para el reporte de "menos
+    // vendidos", que a diferencia de top_prods sí debe incluir los que no
+    // vendieron nada, y trae todo el catálogo para poder filtrar en pantalla.
+    const menos_vendidos = db().prepare(`
+      SELECT p.id, p.nombre, p.sku, p.departamento, c.nombre as categoria,
+        COALESCE((SELECT SUM(t.stock) FROM presentaciones t WHERE t.producto_id=p.id),0) as stock_total,
+        COALESCE(v.qty,0) as qty, COALESCE(v.total,0) as total
+      FROM productos p
+      LEFT JOIN categorias c ON c.id = p.categoria_id
+      LEFT JOIN (
+        SELECT vd.producto_id, SUM(vd.cantidad) as qty, SUM(vd.subtotal) as total
+        FROM ventas_detalle vd JOIN ventas vv ON vv.id=vd.venta_id
+        WHERE date(vv.created_at) BETWEEN ? AND ? AND vv.estado != 'cancelada'
+        GROUP BY vd.producto_id
+      ) v ON v.producto_id = p.id
+      WHERE p.activo = 1
+      ORDER BY qty ASC, p.nombre ASC
+    `).all(fi, ff);
     const clientes_deuda = db().prepare(`SELECT nombre, apellido, telefono, saldo_deuda FROM clientes WHERE saldo_deuda>0 AND activo=1 ORDER BY saldo_deuda DESC LIMIT 20`).all();
-    return ok({ ventas_total, costo_ventas, utilidad_bruta, gastos_total, utilidad_neta, por_dept, por_dia, top_prods, clientes_deuda });
+    return ok({ ventas_total, costo_ventas, utilidad_bruta, gastos_total, utilidad_neta, por_dept, por_dia, top_prods, menos_vendidos, clientes_deuda });
   }));
 
   // ── CONFIGURACIÓN: IDENTIDAD DEL NEGOCIO (nombre + logo/ícono) ──
