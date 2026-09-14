@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { money } from '../format.js';
 import { useAuth } from '../App.jsx';
+import { TicketContenido } from './Ticket.jsx';
+import { useImprimirTicket } from '../utils/useImprimirTicket.js';
 
 export default function Ventas() {
-  const { user } = useAuth();
+  const { user, negocio } = useAuth();
   const [q, setQ] = useState('');
   const [resultados, setResultados] = useState([]);
   const [scanMsg, setScanMsg] = useState('');
@@ -25,6 +27,7 @@ export default function Ventas() {
   const [enganche, setEnganche] = useState(0);
   const [promociones, setPromociones] = useState([]);
   const [ticket, setTicket] = useState(null);
+  const [ticketDetalle, setTicketDetalle] = useState(null);
   const [error, setError] = useState('');
   const timer = useRef(null);
   const cliTimer = useRef(null);
@@ -175,14 +178,21 @@ export default function Ventas() {
     const res = await window.api.ventas.procesar(payload);
     if (!res.ok) { setError(res.error); return; }
     setTicket(res);
+    const detalle = await window.api.ventas.detalle({ id: res.venta_id });
+    if (detalle.ok) setTicketDetalle(detalle);
   }
 
   function nuevaVenta() {
     setCarrito([]); setCliente(null); setDescValor(''); setMontoPagado(''); setNotas('');
     setTipoVenta('contado'); setEnganche(0); setTasaInteres(0);
     setTicket(null);
+    setTicketDetalle(null);
     setTimeout(() => buscadorRef.current?.focus(), 0);
   }
+
+  const { imprimir, imprimiendo, msgImpresion, impresion } = useImprimirTicket({
+    venta: ticketDetalle?.venta, items: ticketDetalle?.items, pagos: ticketDetalle?.pagos, negocio
+  });
 
   return (
     <div className="pos-wrap">
@@ -383,15 +393,26 @@ export default function Ventas() {
 
       {ticket && (
         <div className="modal-overlay open">
-          <div className="modal" style={{ maxWidth: 380, textAlign: 'center' }}>
+          <div className="modal" style={{ maxWidth: 380, textAlign: 'center', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ fontSize: 40, color: 'var(--green)', marginBottom: 10 }}>✓</div>
             <div style={{ fontSize: 22, fontWeight: 800 }}>{money(ticket.total)}</div>
             <div style={{ color: 'var(--muted)', margin: '6px 0' }}>Venta registrada correctamente</div>
             <div>Folio: <code>{ticket.folio}</code></div>
             {ticket.saldo > 0 && <div style={{ color: 'var(--red)', fontWeight: 600, marginTop: 6 }}>Saldo pendiente: {money(ticket.saldo)}</div>}
-            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>Puedes ver e imprimir el ticket desde Historial de Ventas.</div>
+
+            {ticketDetalle && (
+              <div style={{ background: '#fff', borderRadius: 10, padding: 16, marginTop: 18, textAlign: 'left' }}>
+                <TicketContenido venta={ticketDetalle.venta} items={ticketDetalle.items} pagos={ticketDetalle.pagos} negocio={negocio} />
+              </div>
+            )}
+
+            {msgImpresion && <div className="alert alert-error" style={{ marginTop: 10, textAlign: 'left' }}>{msgImpresion}</div>}
+
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 20 }}>
-              <button className="btn btn-primary" onClick={nuevaVenta}>Nueva Venta</button>
+              <button className="btn btn-secondary" onClick={nuevaVenta}>Cerrar</button>
+              <button className="btn btn-primary" onClick={imprimir} disabled={imprimiendo || !ticketDetalle}>
+                {imprimiendo ? 'Imprimiendo...' : impresion?.impresora_ticket ? `Imprimir en ${impresion.impresora_ticket}` : 'Imprimir'}
+              </button>
             </div>
           </div>
         </div>
