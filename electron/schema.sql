@@ -1,13 +1,14 @@
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS usuarios (
-  id         INTEGER PRIMARY KEY AUTOINCREMENT,
-  nombre     TEXT NOT NULL,
-  email      TEXT NOT NULL UNIQUE,
-  password   TEXT NOT NULL,
-  rol        TEXT NOT NULL CHECK (rol IN ('admin','vendedor','almacen')) DEFAULT 'vendedor',
-  activo     INTEGER NOT NULL DEFAULT 1,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+  nombre                 TEXT NOT NULL,
+  email                  TEXT NOT NULL UNIQUE,
+  password               TEXT NOT NULL,
+  rol                    TEXT NOT NULL CHECK (rol IN ('admin','vendedor','almacen')) DEFAULT 'vendedor',
+  activo                 INTEGER NOT NULL DEFAULT 1,
+  debe_cambiar_password  INTEGER NOT NULL DEFAULT 0,
+  created_at             TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS categorias (

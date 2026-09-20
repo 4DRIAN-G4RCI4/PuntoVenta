@@ -1,5 +1,6 @@
 import React, { useEffect, useState, createContext, useContext } from 'react';
 import Login from './pages/Login.jsx';
+import CambiarPasswordObligatorio from './pages/CambiarPasswordObligatorio.jsx';
 import Splash from './pages/Splash.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import Categorias from './pages/Categorias.jsx';
@@ -141,6 +142,20 @@ export default function App() {
         <Login onLogin={login} negocio={negocio} />
         {splashActivo && <Splash negocio={negocio} saliendo={splashSaliendo} />}
       </>
+    );
+  }
+
+  if (user.debe_cambiar_password) {
+    return (
+      <CambiarPasswordObligatorio
+        user={user}
+        onCambiada={() => {
+          const actualizado = { ...user, debe_cambiar_password: 0 };
+          setUser(actualizado);
+          sessionStorage.setItem('pvp_user', JSON.stringify(actualizado));
+        }}
+        onCancelar={logoutInmediato}
+      />
     );
   }
 

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 
 export default function Login({ onLogin, negocio }) {
-  const [email, setEmail] = useState('admin@tienda.com');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [mostrarPassword, setMostrarPassword] = useState(false);
   const [error, setError] = useState('');
@@ -55,9 +55,6 @@ export default function Login({ onLogin, negocio }) {
             {loading ? 'Ingresando...' : 'Iniciar sesión'}
           </button>
         </form>
-        <div style={{ marginTop: 18, fontSize: 11, color: 'var(--muted)', textAlign: 'center' }}>
-          admin@tienda.com / admin123 · vendedor@tienda.com / vendedor123 · almacen@tienda.com / almacen123
-        </div>
       </div>
     </div>
   );

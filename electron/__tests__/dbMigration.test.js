@@ -28,6 +28,10 @@ test('base de datos nueva: crea presentaciones/lotes/proveedores y los campos de
     assert.ok(cols('presentaciones').includes('presentacion'));
     assert.ok(cols('lotes').includes('presentacion_id'));
     assert.ok(cols('proveedores').includes('nombre'));
+    assert.ok(cols('usuarios').includes('debe_cambiar_password'));
+
+    const admin = db.prepare("SELECT debe_cambiar_password FROM usuarios WHERE email='admin@tienda.com'").get();
+    assert.equal(admin.debe_cambiar_password, 1, 'las contraseñas semilla deben quedar marcadas como temporales (A4)');
 
     const prodCols = cols('productos');
     for (const campo of ['principio_activo', 'laboratorio', 'forma_farmaceutica', 'registro_sanitario', 'requiere_receta', 'sustancia_controlada', 'iva', 'maneja_lotes']) {

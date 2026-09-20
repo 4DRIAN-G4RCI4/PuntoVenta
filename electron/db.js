@@ -46,6 +46,7 @@ function openDatabase(targetPath) {
   ensureColumn(db, 'ventas_detalle', 'receta_folio', 'TEXT');
   ensureColumn(db, 'ventas_detalle', 'identificacion_comprador', 'TEXT');
   ensureColumn(db, 'gastos', 'proveedor_id', 'INTEGER REFERENCES proveedores(id) ON DELETE SET NULL');
+  ensureColumn(db, 'usuarios', 'debe_cambiar_password', 'INTEGER NOT NULL DEFAULT 0');
 
   if (isNew) seed(db);
 
@@ -107,8 +108,12 @@ function generateFolio() {
 function seed(db) {
   const hash = (p) => bcrypt.hashSync(p, 10);
 
+  // Contraseñas temporales: debe_cambiar_password=1 obliga a cambiarlas en el
+  // primer inicio de sesión (antes de poder usar el resto de la app) — así
+  // que aunque estas queden documentadas para la instalación inicial, nunca
+  // se quedan activas en un sistema ya en uso real. Ver docs/CREDENCIALES-INICIALES.md.
   const insUser = db.prepare(
-    `INSERT INTO usuarios (nombre, email, password, rol, activo) VALUES (?,?,?,?,1)`
+    `INSERT INTO usuarios (nombre, email, password, rol, activo, debe_cambiar_password) VALUES (?,?,?,?,1,1)`
   );
   insUser.run('Administrador', 'admin@tienda.com', hash('admin123'), 'admin');
   insUser.run('Vendedor Demo', 'vendedor@tienda.com', hash('vendedor123'), 'vendedor');

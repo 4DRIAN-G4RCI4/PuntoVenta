@@ -144,6 +144,22 @@ function register(mainWindow, actualizaciones = {}) {
     return ok();
   });
 
+  // Cambio de contraseña obligatorio (primer login, o después de que el admin
+  // resetea una cuenta): a propósito NO requiere rol admin — es la única
+  // excepción a "solo el admin cambia contraseñas", porque de otro modo un
+  // vendedor/almacén con debe_cambiar_password=1 quedaría bloqueado sin poder
+  // resolverlo él mismo. Solo puede cambiar LA SUYA, y solo si de verdad está
+  // marcada como pendiente — no es una puerta trasera para cambiar cualquier otra.
+  ipcMain.handle('auth:cambiarPasswordObligatorio', (event, { newPassword } = {}) => {
+    const s = sesiones.get(event.sender.id);
+    if (!s) return err('Tu sesión expiró o no es válida. Inicia sesión de nuevo.');
+    if (!esTextoValido(newPassword, { min: 8, max: 200 })) return err('La nueva contraseña debe tener al menos 8 caracteres.');
+    const user = db().prepare('SELECT debe_cambiar_password FROM usuarios WHERE id=?').get(s.id);
+    if (!user || !user.debe_cambiar_password) return err('No tienes un cambio de contraseña pendiente.');
+    db().prepare('UPDATE usuarios SET password=?, debe_cambiar_password=0 WHERE id=?').run(bcrypt.hashSync(newPassword, 10), s.id);
+    return ok();
+  });
+
   // Solo el administrador puede cambiar contraseñas. Vendedores y almacén
   // deben pedirle al administrador que se la cambie desde la sección Usuarios.
   ipcMain.handle('auth:changePassword', proteger(ROLES.ADMIN, (event, { currentPassword, newPassword } = {}, s) => {
@@ -277,7 +293,9 @@ function register(mainWindow, actualizaciones = {}) {
         const existente = db().prepare('SELECT id FROM usuarios WHERE lower(email)=? AND id!=?').get(correo, u.id);
         if (existente) return err('Ese correo ya está en uso por otro usuario.');
         if (u.password) {
-          db().prepare('UPDATE usuarios SET nombre=?,email=?,rol=?,activo=?,password=? WHERE id=?')
+          // Una contraseña puesta por el admin (alta o reseteo) siempre queda
+          // temporal — el dueño de la cuenta debe cambiarla en su próximo login.
+          db().prepare('UPDATE usuarios SET nombre=?,email=?,rol=?,activo=?,password=?,debe_cambiar_password=1 WHERE id=?')
             .run(u.nombre.trim(), u.email.trim(), u.rol, u.activo ? 1 : 0, bcrypt.hashSync(u.password, 10), u.id);
         } else {
           db().prepare('UPDATE usuarios SET nombre=?,email=?,rol=?,activo=? WHERE id=?')
@@ -287,7 +305,7 @@ function register(mainWindow, actualizaciones = {}) {
         if (!esTextoValido(u.password, { min: 8, max: 200 })) return err('Ingresa una contraseña de al menos 8 caracteres para el nuevo usuario.');
         const existente = db().prepare('SELECT id FROM usuarios WHERE lower(email)=?').get(correo);
         if (existente) return err('Ese correo ya está registrado.');
-        db().prepare('INSERT INTO usuarios (nombre,email,password,rol,activo) VALUES (?,?,?,?,?)')
+        db().prepare('INSERT INTO usuarios (nombre,email,password,rol,activo,debe_cambiar_password) VALUES (?,?,?,?,?,1)')
           .run(u.nombre.trim(), u.email.trim(), bcrypt.hashSync(u.password, 10), u.rol, u.activo ? 1 : 0);
       }
       return ok();

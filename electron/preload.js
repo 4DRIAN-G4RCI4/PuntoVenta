@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('api', {
     login: invoke('auth:login'),
     logout: invoke('auth:logout'),
     changePassword: invoke('auth:changePassword'),
+    cambiarPasswordObligatorio: invoke('auth:cambiarPasswordObligatorio'),
     updateProfile: invoke('auth:updateProfile')
   },
   usuarios: {
