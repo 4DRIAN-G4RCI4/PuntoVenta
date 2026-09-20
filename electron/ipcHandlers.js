@@ -1087,6 +1087,25 @@ function register(mainWindow, actualizaciones = {}) {
     return ok({ ventas_total, costo_ventas, utilidad_bruta, gastos_total, utilidad_neta, por_dept, por_forma_pago, por_dia, top_prods, menos_vendidos, clientes_deuda });
   }));
 
+  // ── CONFIGURACIÓN: PROYECTO DE SUPABASE (URL + clave publishable) ──
+  // Permite que cada instalación (cada negocio/cliente) apunte a SU PROPIO
+  // proyecto de Supabase sin tocar código — antes estaba fijo en supabaseSync.js.
+  ipcMain.handle('config:getSupabaseConfig', proteger(ROLES.ADMIN, () => {
+    const row = db().prepare('SELECT supabase_url, supabase_anon_key FROM app_config WHERE id=1').get();
+    return ok({ supabase_url: row?.supabase_url || '', supabase_anon_key: row?.supabase_anon_key || '' });
+  }));
+
+  ipcMain.handle('config:setSupabaseConfig', proteger(ROLES.ADMIN, (event, { supabase_url, supabase_anon_key } = {}) => {
+    if (sync.estaConfigurado()) return err('Primero desconecta la sincronización actual antes de cambiar de proyecto de Supabase.');
+    if (!esTextoValido(supabase_url, { min: 8, max: 300 }) || !/^https:\/\/.+\.supabase\.co\/?$/.test(supabase_url.trim())) {
+      return err('La URL debe verse como https://tuproyecto.supabase.co');
+    }
+    if (!esTextoValido(supabase_anon_key, { min: 10, max: 500 })) return err('La clave anónima/publishable es requerida.');
+    db().prepare('UPDATE app_config SET supabase_url=?, supabase_anon_key=? WHERE id=1')
+      .run(supabase_url.trim().replace(/\/$/, ''), supabase_anon_key.trim());
+    return ok();
+  }));
+
   // ── CONFIGURACIÓN: IDENTIDAD DEL NEGOCIO (nombre + logo/ícono) ──
   // Lectura pública (se necesita en la pantalla de login, antes de autenticar).
   ipcMain.handle('config:getNegocio', () => {

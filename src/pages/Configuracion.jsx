@@ -20,12 +20,28 @@ export default function Configuracion() {
   const [reenviandoTodo, setReenviandoTodo] = useState(false);
   const [progreso, setProgreso] = useState(null);
   const [cancelando, setCancelando] = useState(false);
+  const [supabaseUrl, setSupabaseUrl] = useState('');
+  const [supabaseAnonKey, setSupabaseAnonKey] = useState('');
+  const [supabaseProyectoMsg, setSupabaseProyectoMsg] = useState('');
 
   async function cargarEstadoSync() {
     const r = await window.api.sync.estado();
     if (r.ok) setSyncEstado(r);
   }
   useEffect(() => { cargarEstadoSync(); }, []);
+
+  useEffect(() => {
+    window.api.config.getSupabaseConfig().then((r) => {
+      if (r.ok) { setSupabaseUrl(r.supabase_url); setSupabaseAnonKey(r.supabase_anon_key); }
+    });
+  }, []);
+
+  async function guardarProyectoSupabase() {
+    setSupabaseProyectoMsg('');
+    const res = await window.api.config.setSupabaseConfig({ supabase_url: supabaseUrl, supabase_anon_key: supabaseAnonKey });
+    setSupabaseProyectoMsg(res.ok ? 'Proyecto de Supabase guardado.' : res.error);
+    return res.ok;
+  }
 
   useEffect(() => {
     const unsub = window.api.sync.onProgreso((p) => setProgreso(p));
@@ -35,6 +51,10 @@ export default function Configuracion() {
   async function conectarSync() {
     setConectando(true);
     setSyncMsg('');
+    if (supabaseUrl.trim()) {
+      const guardadoOk = await guardarProyectoSupabase();
+      if (!guardadoOk) { setConectando(false); return; }
+    }
     setProgreso({ total: 0, enviados: 0, restantes: 0 });
     const res = await window.api.sync.configurar({ email: syncEmail, password: syncPassword });
     setConectando(false);
@@ -245,6 +265,23 @@ export default function Configuracion() {
           </>
         ) : (
           <>
+            <div className="card" style={{ background: 'var(--surface2)', marginBottom: 16 }}>
+              <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 8 }}>Proyecto de Supabase</div>
+              <p style={{ color: 'var(--muted)', fontSize: 11, marginBottom: 10 }}>
+                Déjalo en blanco para usar el proyecto por defecto. Si vas a conectar este negocio a SU PROPIO proyecto de Supabase, pega aquí su URL y clave "publishable"/anon (Supabase → Settings → API).
+              </p>
+              {supabaseProyectoMsg && <div className={'alert ' + (supabaseProyectoMsg.includes('guardado') ? 'alert-success' : 'alert-error')} style={{ marginBottom: 10 }}>{supabaseProyectoMsg}</div>}
+              <div className="form-grid">
+                <div className="form-group">
+                  <label>URL del proyecto</label>
+                  <input value={supabaseUrl} onChange={(e) => setSupabaseUrl(e.target.value)} placeholder="https://tuproyecto.supabase.co" />
+                </div>
+                <div className="form-group">
+                  <label>Clave anónima / publishable</label>
+                  <input value={supabaseAnonKey} onChange={(e) => setSupabaseAnonKey(e.target.value)} placeholder="sb_publishable_..." />
+                </div>
+              </div>
+            </div>
             <div className="form-grid">
               <div className="form-group">
                 <label>Correo (el mismo que usarás en la app móvil)</label>

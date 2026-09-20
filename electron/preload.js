@@ -114,6 +114,8 @@ contextBridge.exposeInMainWorld('api', {
     exportDb: invoke('config:exportDb'),
     importDb: invoke('config:importDb'),
     getNegocio: invoke('config:getNegocio'),
+    getSupabaseConfig: invoke('config:getSupabaseConfig'),
+    setSupabaseConfig: invoke('config:setSupabaseConfig'),
     setNegocio: invoke('config:setNegocio'),
     getImpresion: invoke('config:getImpresion'),
     setImpresion: invoke('config:setImpresion')

@@ -16,10 +16,23 @@
 const { getDb } = require('./db');
 
 // Credenciales del proyecto de Supabase (URL + clave "publishable"/anon).
-// No son secretas por diseño — están protegidas por las políticas RLS
-// del lado de Supabase (solo usuarios autenticados pueden leer/escribir).
-const SUPABASE_URL = 'https://wsyjdhbnuaqkmixmgopx.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable__45JgkYo2a0FGsYCjkazLQ_565K0mgh';
+// No son secretas por diseño — están protegidas por las políticas RLS del
+// lado de Supabase (solo usuarios autenticados pueden leer/escribir).
+//
+// Configurables desde Configuración → App Móvil (para que cada instalación
+// — cada negocio/cliente — pueda apuntar a SU PROPIO proyecto de Supabase,
+// sin tener que tocar código ni recompilar). Si no se ha configurado nada
+// todavía, se usan estos valores por defecto (el proyecto original).
+const SUPABASE_URL_DEFAULT = 'https://wsyjdhbnuaqkmixmgopx.supabase.co';
+const SUPABASE_ANON_KEY_DEFAULT = 'sb_publishable__45JgkYo2a0FGsYCjkazLQ_565K0mgh';
+
+function credencialesSupabase() {
+  const row = db().prepare('SELECT supabase_url, supabase_anon_key FROM app_config WHERE id=1').get() || {};
+  return {
+    url: row.supabase_url || SUPABASE_URL_DEFAULT,
+    anonKey: row.supabase_anon_key || SUPABASE_ANON_KEY_DEFAULT
+  };
+}
 
 const PK = {
   ventas_resumen: 'id', gastos_resumen: 'id', stock_alertas: 'presentacion_id', negocio: 'id',
@@ -43,9 +56,10 @@ function estaConfigurado() {
 
 async function configurarSync({ email, password }) {
   try {
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+    const { url, anonKey } = credencialesSupabase();
+    const res = await fetch(`${url}/auth/v1/token?grant_type=password`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY },
+      headers: { 'Content-Type': 'application/json', apikey: anonKey },
       body: JSON.stringify({ email, password })
     });
     const data = await res.json();
@@ -69,9 +83,10 @@ async function refrescarToken() {
   const cfg = getConfig();
   if (!cfg.supabase_refresh_token) return false;
   try {
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+    const { url, anonKey } = credencialesSupabase();
+    const res = await fetch(`${url}/auth/v1/token?grant_type=refresh_token`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY },
+      headers: { 'Content-Type': 'application/json', apikey: anonKey },
       body: JSON.stringify({ refresh_token: cfg.supabase_refresh_token })
     });
     const data = await res.json();
@@ -246,8 +261,9 @@ async function textoError(res) {
  * uno necesita su propio filtro por llave primaria). Devuelve { ok, error } — el error
  * trae el motivo real que dio Supabase (permisos RLS, columna inválida, etc.). */
 async function enviarGrupo(grupo) {
-  const url = `${SUPABASE_URL}/rest/v1/${grupo.tabla}`;
-  const headers = { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${accessToken}` };
+  const { url: baseUrl, anonKey } = credencialesSupabase();
+  const url = `${baseUrl}/rest/v1/${grupo.tabla}`;
+  const headers = { 'Content-Type': 'application/json', apikey: anonKey, Authorization: `Bearer ${accessToken}` };
 
   if (grupo.operacion === 'delete') {
     const key = PK[grupo.tabla] || 'id';
