@@ -56,7 +56,9 @@ function aplicarDeducciones(db, deducciones) {
  *    después — nunca se pierde silenciosamente la trazabilidad.
  *
  * Para presentaciones que NO manejan lotes, simplemente actualiza el stock. */
-function reconciliarStockPresentacion(db, presentacionId, nuevoStock, { usuarioId = null, motivo = 'Conteo físico' } = {}) {
+function reconciliarStockPresentacion(db, presentacionId, nuevoStock, {
+  usuarioId = null, motivo = 'Conteo físico', etiquetaLoteAlta = 'AJUSTE-FISICO', tipoMovimiento = 'ajuste'
+} = {}) {
   const presentacion = db.prepare(
     `SELECT t.id, t.stock, t.producto_id, p.maneja_lotes FROM presentaciones t JOIN productos p ON p.id = t.producto_id WHERE t.id = ?`
   ).get(presentacionId);
@@ -90,16 +92,49 @@ function reconciliarStockPresentacion(db, presentacionId, nuevoStock, { usuarioI
       }
     } else {
       db.prepare('INSERT INTO lotes (presentacion_id, numero_lote, fecha_caducidad, cantidad) VALUES (?,?,?,?)')
-        .run(presentacionId, 'AJUSTE-FISICO', null, diff);
-      motivo = `${motivo} (alta registrada como lote "AJUSTE-FISICO" sin caducidad — captúrala cuando sepas cuál es)`;
+        .run(presentacionId, etiquetaLoteAlta, null, diff);
+      motivo = `${motivo} (alta registrada como lote "${etiquetaLoteAlta}" sin caducidad — captúrala cuando sepas cuál es)`;
     }
   }
 
   db.prepare('UPDATE presentaciones SET stock=? WHERE id=?').run(nuevoStock, presentacionId);
   db.prepare('INSERT INTO inventario_movimientos (producto_id, presentacion_id, tipo, cantidad, motivo, usuario_id) VALUES (?,?,?,?,?,?)')
-    .run(presentacion.producto_id, presentacionId, 'ajuste', diff, motivo, usuarioId);
+    .run(presentacion.producto_id, presentacionId, tipoMovimiento, diff, motivo, usuarioId);
 
   return { ok: true, diff };
 }
 
-module.exports = { seleccionarLotesFEFO, aplicarDeducciones, reconciliarStockPresentacion };
+function round2(n) { return Math.round((Number(n) || 0) * 100) / 100; }
+
+/** Calcula cómo debe quedar una venta después de una devolución — la parte de
+ * dinero, no de inventario (ver reconciliarStockPresentacion para eso). Pura:
+ * no toca la base de datos, para poder probarla sin abrir una transacción.
+ *
+ *  - `montoAbsorbidoPorDeuda`: cuánto de lo devuelto cancela saldo pendiente
+ *    (el cliente ya no debe eso — aplica a cualquier tipo de devolución).
+ *  - `montoARegresarEnEfectivo`: cuánto hay que sacar físicamente de caja —
+ *    SOLO si es "reembolso" y sobra algo después de cubrir la deuda (un
+ *    "cambio" o "nota_credito" nunca saca dinero de caja).
+ *  - `nuevoEstado`: 'devuelta' si ya se devolvió el valor completo de la venta
+ *    (acumulando todas sus devoluciones), 'pagada' si con esto se saldó la
+ *    deuda restante, o se queda como estaba. */
+function calcularReversionDevolucion({
+  ventaTotal, ventaSaldoPendiente, ventaMontoPagado, ventaEstado,
+  tipoDevolucion, montoDevuelto, totalDevueltoAcumulado
+}) {
+  const montoAbsorbidoPorDeuda = round2(Math.min(montoDevuelto, ventaSaldoPendiente));
+  const montoARegresarEnEfectivo = tipoDevolucion === 'reembolso' ? round2(montoDevuelto - montoAbsorbidoPorDeuda) : 0;
+  const nuevoSaldoPendiente = round2(Math.max(0, ventaSaldoPendiente - montoAbsorbidoPorDeuda));
+  const nuevoMontoPagado = round2(Math.max(0, ventaMontoPagado - montoARegresarEnEfectivo));
+
+  let nuevoEstado = ventaEstado;
+  if (totalDevueltoAcumulado >= ventaTotal - 0.01) {
+    nuevoEstado = 'devuelta';
+  } else if (nuevoSaldoPendiente <= 0 && ['credito', 'pendiente', 'a_meses'].includes(ventaEstado)) {
+    nuevoEstado = 'pagada';
+  }
+
+  return { montoAbsorbidoPorDeuda, montoARegresarEnEfectivo, nuevoSaldoPendiente, nuevoMontoPagado, nuevoEstado };
+}
+
+module.exports = { seleccionarLotesFEFO, aplicarDeducciones, reconciliarStockPresentacion, calcularReversionDevolucion };

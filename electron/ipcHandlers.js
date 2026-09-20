@@ -26,7 +26,7 @@ const os = require('node:os');
 const bcrypt = require('bcryptjs');
 const { getDb, getDbPath, reopenDatabase, generateFolio } = require('./db');
 const sync = require('./supabaseSync');
-const { seleccionarLotesFEFO, aplicarDeducciones, reconciliarStockPresentacion } = require('./logicaFarmacia');
+const { seleccionarLotesFEFO, aplicarDeducciones, reconciliarStockPresentacion, calcularReversionDevolucion } = require('./logicaFarmacia');
 
 const ROL_PERMISOS = {
   admin: '*',
@@ -179,7 +179,7 @@ function register(mainWindow, actualizaciones = {}) {
 
   function calcularEsperado(usuarioId, fechaInicio) {
     const rows = db().prepare(`SELECT forma_pago, COALESCE(SUM(total),0) as total, COUNT(*) as num FROM ventas
-      WHERE usuario_id=? AND created_at > ? AND estado!='cancelada' GROUP BY forma_pago`).all(usuarioId, fechaInicio);
+      WHERE usuario_id=? AND created_at > ? AND estado NOT IN ('cancelada','devuelta') GROUP BY forma_pago`).all(usuarioId, fechaInicio);
     const porForma = { efectivo: 0, tarjeta: 0, transferencia: 0 };
     let numVentas = 0;
     for (const r of rows) {
@@ -240,7 +240,7 @@ function register(mainWindow, actualizaciones = {}) {
   ipcMain.handle('usuarios:resumenActividad', proteger(ROLES.ADMIN, () => {
     const usuarios = db().prepare('SELECT id,nombre,email,rol,activo,created_at FROM usuarios ORDER BY rol, nombre').all();
     const resumen = usuarios.map((u) => {
-      const ventas = db().prepare(`SELECT COUNT(*) num, COALESCE(SUM(total),0) total FROM ventas WHERE usuario_id=? AND estado!='cancelada'`).get(u.id);
+      const ventas = db().prepare(`SELECT COUNT(*) num, COALESCE(SUM(total),0) total FROM ventas WHERE usuario_id=? AND estado NOT IN ('cancelada','devuelta')`).get(u.id);
       const cortesNum = db().prepare('SELECT COUNT(*) num FROM cortes_caja WHERE usuario_id=?').get(u.id).num;
       const cortesOmitidos = db().prepare(`SELECT COUNT(*) num FROM cortes_caja WHERE usuario_id=? AND estado='omitido'`).get(u.id).num;
       const ultimoCorte = db().prepare('SELECT estado, created_at, diferencia FROM cortes_caja WHERE usuario_id=? ORDER BY created_at DESC LIMIT 1').get(u.id) || null;
@@ -711,7 +711,7 @@ function register(mainWindow, actualizaciones = {}) {
     sql += orden === 'monto_desc' ? ' ORDER BY v.saldo_pendiente DESC' : ' ORDER BY v.created_at ASC';
     const rows = db().prepare(sql).all(...params);
     const resumen = db().prepare(`SELECT COUNT(*) num_creditos, COALESCE(SUM(saldo_pendiente),0) total_deuda,
-      COUNT(DISTINCT cliente_id) clientes_con_deuda FROM ventas WHERE saldo_pendiente>0 AND estado!='cancelada'`).get();
+      COUNT(DISTINCT cliente_id) clientes_con_deuda FROM ventas WHERE saldo_pendiente>0 AND estado NOT IN ('cancelada','devuelta')`).get();
     return { rows, resumen };
   }));
 
@@ -796,6 +796,8 @@ function register(mainWindow, actualizaciones = {}) {
     if (!['reembolso', 'cambio', 'nota_credito'].includes(tipo_devolucion)) return err('Tipo de devolución inválido.');
     try {
       const result = db().transaction(() => {
+        const venta = db().prepare('SELECT id, folio, total, saldo_pendiente, monto_pagado, cliente_id, estado, forma_pago FROM ventas WHERE id=?').get(venta_id);
+        if (!venta) throw new Error('Venta no encontrada.');
         const detalleOriginal = db().prepare('SELECT producto_id, presentacion_id, cantidad, precio_unitario FROM ventas_detalle WHERE venta_id=?').all(venta_id);
         if (!detalleOriginal.length) throw new Error('Venta no encontrada.');
         let monto_total = 0;
@@ -824,13 +826,52 @@ function register(mainWindow, actualizaciones = {}) {
         for (const item of resueltos) {
           db().prepare('INSERT INTO devoluciones_detalle (devolucion_id, producto_id, presentacion_id, cantidad, precio_unitario) VALUES (?,?,?,?,?)')
             .run(dev_id, item.prod_id, item.presentacion_id, item.qty, item.precio);
-          if (item.presentacion_id) db().prepare('UPDATE presentaciones SET stock=stock+? WHERE id=?').run(item.qty, item.presentacion_id);
+          if (item.presentacion_id) {
+            // Regresa el stock pasando SIEMPRE por reconciliarStockPresentacion, para
+            // que en productos con maneja_lotes=1 el alta quede como un lote real
+            // ("DEV-VENTA") y nunca se rompa la invariante stock = SUM(lotes.cantidad).
+            const pres = db().prepare('SELECT stock FROM presentaciones WHERE id=?').get(item.presentacion_id);
+            if (pres) {
+              reconciliarStockPresentacion(db(), item.presentacion_id, pres.stock + item.qty, {
+                usuarioId: s.id, motivo: `Devolución de venta ${venta.folio}`, etiquetaLoteAlta: 'DEV-VENTA', tipoMovimiento: 'entrada'
+              });
+            }
+          }
         }
-        db().prepare("UPDATE ventas SET estado='devuelta' WHERE id=?").run(venta_id);
+
+        // ── Dinero: revertir deuda y/o registrar el egreso real de caja ──
+        const totalDevueltoAcumulado = round2(
+          (db().prepare("SELECT COALESCE(SUM(monto_total),0) t FROM devoluciones WHERE venta_id=? AND estado='procesada'").get(venta_id).t)
+        );
+        const {
+          montoAbsorbidoPorDeuda, montoARegresarEnEfectivo, nuevoSaldoPendiente, nuevoMontoPagado, nuevoEstado
+        } = calcularReversionDevolucion({
+          ventaTotal: venta.total, ventaSaldoPendiente: venta.saldo_pendiente, ventaMontoPagado: venta.monto_pagado,
+          ventaEstado: venta.estado, tipoDevolucion: tipo_devolucion, montoDevuelto: monto_total, totalDevueltoAcumulado
+        });
+
+        if (montoAbsorbidoPorDeuda > 0 && venta.cliente_id) {
+          db().prepare('UPDATE clientes SET saldo_deuda = MAX(0, saldo_deuda - ?) WHERE id=?').run(montoAbsorbidoPorDeuda, venta.cliente_id);
+        }
+
+        let gastoId = null;
+        if (montoARegresarEnEfectivo > 0) {
+          const fechaHoy = new Date().toISOString().slice(0, 10);
+          const infoGasto = db().prepare(`INSERT INTO gastos (concepto, monto, categoria, forma_pago, fecha, notas, usuario_id) VALUES (?,?,?,?,?,?,?)`)
+            .run(`Reembolso — devolución de venta ${venta.folio}`, montoARegresarEnEfectivo, 'devoluciones', venta.forma_pago, fechaHoy, limpiar(notas, 500), s.id);
+          gastoId = infoGasto.lastInsertRowid;
+        }
+
+        db().prepare('UPDATE ventas SET estado=?, saldo_pendiente=?, monto_pagado=? WHERE id=?')
+          .run(nuevoEstado, nuevoSaldoPendiente, nuevoMontoPagado, venta_id);
+
         const presentacionesAfectadas = resueltos.filter((i) => i.presentacion_id).map((i) => i.presentacion_id);
-        return { dev_id, monto_total, presentacionesAfectadas };
+        return { dev_id, monto_total, presentacionesAfectadas, gastoId };
       })();
       sync.encolarDevolucion(result.dev_id);
+      sync.encolarVenta(venta_id);
+      sync.encolarCredito(venta_id);
+      if (result.gastoId) sync.encolarGasto(result.gastoId);
       for (const presentacionId of result.presentacionesAfectadas) sync.evaluarYEncolarStock(presentacionId);
       return ok({ devolucion_id: result.dev_id, monto: result.monto_total });
     } catch (e) { return err(e.message); }
@@ -990,21 +1031,21 @@ function register(mainWindow, actualizaciones = {}) {
   ipcMain.handle('reportes:generar', proteger(ROLES.ADMIN, (event, { fecha_inicio, fecha_fin } = {}) => {
     const fi = /^\d{4}-\d{2}-\d{2}$/.test(fecha_inicio || '') ? fecha_inicio : '1970-01-01';
     const ff = /^\d{4}-\d{2}-\d{2}$/.test(fecha_fin || '') ? fecha_fin : '2999-12-31';
-    const ventas_total = db().prepare(`SELECT COUNT(*) as num, COALESCE(SUM(total),0) as total, COALESCE(SUM(descuento_monto),0) as descuentos FROM ventas WHERE date(created_at) BETWEEN ? AND ? AND estado!='cancelada'`).get(fi, ff);
-    const costo_ventas = db().prepare(`SELECT COALESCE(SUM(vd.costo_unitario*vd.cantidad),0) as costo FROM ventas_detalle vd JOIN ventas v ON v.id=vd.venta_id WHERE date(v.created_at) BETWEEN ? AND ? AND v.estado!='cancelada'`).get(fi, ff).costo;
+    const ventas_total = db().prepare(`SELECT COUNT(*) as num, COALESCE(SUM(total),0) as total, COALESCE(SUM(descuento_monto),0) as descuentos FROM ventas WHERE date(created_at) BETWEEN ? AND ? AND estado NOT IN ('cancelada','devuelta')`).get(fi, ff);
+    const costo_ventas = db().prepare(`SELECT COALESCE(SUM(vd.costo_unitario*vd.cantidad),0) as costo FROM ventas_detalle vd JOIN ventas v ON v.id=vd.venta_id WHERE date(v.created_at) BETWEEN ? AND ? AND v.estado NOT IN ('cancelada','devuelta')`).get(fi, ff).costo;
     const utilidad_bruta = ventas_total.total - costo_ventas;
     const gastos_total = db().prepare('SELECT COALESCE(SUM(monto),0) as total FROM gastos WHERE fecha BETWEEN ? AND ?').get(fi, ff).total;
     const utilidad_neta = utilidad_bruta - gastos_total;
     const por_dept = db().prepare(`SELECT p.departamento, SUM(vd.cantidad) as unidades, SUM(vd.subtotal) as total, SUM(vd.costo_unitario*vd.cantidad) as costo, SUM(vd.subtotal)-SUM(vd.costo_unitario*vd.cantidad) as utilidad
-      FROM ventas_detalle vd JOIN productos p ON p.id=vd.producto_id JOIN ventas v ON v.id=vd.venta_id WHERE date(v.created_at) BETWEEN ? AND ? AND v.estado!='cancelada' GROUP BY p.departamento`).all(fi, ff);
+      FROM ventas_detalle vd JOIN productos p ON p.id=vd.producto_id JOIN ventas v ON v.id=vd.venta_id WHERE date(v.created_at) BETWEEN ? AND ? AND v.estado NOT IN ('cancelada','devuelta') GROUP BY p.departamento`).all(fi, ff);
     const por_forma_pago = db().prepare(`SELECT forma_pago, COUNT(*) as num, SUM(total) as total
-      FROM ventas WHERE date(created_at) BETWEEN ? AND ? AND estado!='cancelada' GROUP BY forma_pago`).all(fi, ff);
+      FROM ventas WHERE date(created_at) BETWEEN ? AND ? AND estado NOT IN ('cancelada','devuelta') GROUP BY forma_pago`).all(fi, ff);
     const por_dia = db().prepare(`SELECT date(v.created_at) as dia, SUM(v.total) as total, COUNT(*) as num, SUM(COALESCE(c.costo,0)) as costo, SUM(v.total)-SUM(COALESCE(c.costo,0)) as utilidad
       FROM ventas v
       LEFT JOIN (SELECT vd.venta_id, SUM(vd.costo_unitario*vd.cantidad) as costo FROM ventas_detalle vd GROUP BY vd.venta_id) c ON c.venta_id=v.id
-      WHERE date(v.created_at) BETWEEN ? AND ? AND v.estado!='cancelada' GROUP BY dia ORDER BY dia`).all(fi, ff);
+      WHERE date(v.created_at) BETWEEN ? AND ? AND v.estado NOT IN ('cancelada','devuelta') GROUP BY dia ORDER BY dia`).all(fi, ff);
     const top_prods = db().prepare(`SELECT p.nombre, p.departamento, SUM(vd.cantidad) as qty, SUM(vd.subtotal) as total, SUM(vd.subtotal)-SUM(vd.costo_unitario*vd.cantidad) as utilidad
-      FROM ventas_detalle vd JOIN productos p ON p.id=vd.producto_id JOIN ventas v ON v.id=vd.venta_id WHERE date(v.created_at) BETWEEN ? AND ? AND v.estado!='cancelada' GROUP BY p.id ORDER BY qty DESC LIMIT 10`).all(fi, ff);
+      FROM ventas_detalle vd JOIN productos p ON p.id=vd.producto_id JOIN ventas v ON v.id=vd.venta_id WHERE date(v.created_at) BETWEEN ? AND ? AND v.estado NOT IN ('cancelada','devuelta') GROUP BY p.id ORDER BY qty DESC LIMIT 10`).all(fi, ff);
     // Todos los productos activos, con sus unidades vendidas en el periodo (0 si
     // no tuvo ninguna venta) y su stock actual — para el reporte de "menos
     // vendidos", que a diferencia de top_prods sí debe incluir los que no
@@ -1018,7 +1059,7 @@ function register(mainWindow, actualizaciones = {}) {
       LEFT JOIN (
         SELECT vd.producto_id, SUM(vd.cantidad) as qty, SUM(vd.subtotal) as total
         FROM ventas_detalle vd JOIN ventas vv ON vv.id=vd.venta_id
-        WHERE date(vv.created_at) BETWEEN ? AND ? AND vv.estado != 'cancelada'
+        WHERE date(vv.created_at) BETWEEN ? AND ? AND vv.estado NOT IN ('cancelada','devuelta')
         GROUP BY vd.producto_id
       ) v ON v.producto_id = p.id
       WHERE p.activo = 1
@@ -1138,7 +1179,14 @@ function register(mainWindow, actualizaciones = {}) {
     });
     if (canceled || !filePath) return err('Exportación cancelada.');
     try {
-      fs.copyFileSync(getDbPath(), filePath);
+      // NUNCA copiar el archivo .db "vivo" con fs.copyFileSync: en modo WAL, los
+      // cambios ya confirmados (ventas recientes) pueden seguir en data.db-wal
+      // sin haberse volcado todavía al archivo principal — una copia directa del
+      // archivo puede quedar incompleta sin que nadie se entere hasta que ya es
+      // tarde. VACUUM INTO genera una copia consistente y completa en un solo
+      // paso, tomando en cuenta el WAL, sin afectar la base de datos en uso.
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      db().prepare('VACUUM INTO ?').run(filePath);
       return ok({ path: filePath });
     } catch (e) { return err(e.message); }
   }));

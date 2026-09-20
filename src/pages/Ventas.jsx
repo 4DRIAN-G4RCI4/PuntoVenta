@@ -173,7 +173,11 @@ export default function Ventas() {
       payload.cuota_mensual = Number(cuota.toFixed(2));
       payload.monto_pagado = Number(enganche) || 0;
     } else {
-      payload.monto_pagado = pagado || total;
+      // En "contado" es razonable asumir pago completo si el cajero no escribió
+      // nada (la mayoría de las ventas de contado se pagan íntegras). Pero en
+      // "crédito" dejarlo vacío significa justo eso: $0 recibido — nunca se debe
+      // sustituir por el total, o la deuda nunca se registra (bug real, C3).
+      payload.monto_pagado = tipoVenta === 'credito' ? pagado : (pagado || total);
     }
     const res = await window.api.ventas.procesar(payload);
     if (!res.ok) { setError(res.error); return; }
