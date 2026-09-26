@@ -47,8 +47,21 @@ autoUpdater.on('download-progress', (p) => avisarEstadoActualizacion({ fase: 'de
 autoUpdater.on('update-downloaded', (info) => avisarEstadoActualizacion({ fase: 'lista', version: info.version }));
 autoUpdater.on('error', (e) => {
   log.error('[autoUpdater]', e);
-  avisarEstadoActualizacion({ fase: 'error', error: e.message });
+  avisarEstadoActualizacion({ fase: 'error', error: mensajeAmigableUpdate(e) });
 });
+
+// electron-updater manda el texto crudo de la respuesta de GitHub (incluye
+// encabezados HTTP, cookies, todo) — nunca se lo mostramos así al usuario.
+function mensajeAmigableUpdate(e) {
+  const msg = String(e?.message || e || '');
+  if (msg.includes('releases.atom') || msg.includes('HttpError: 404')) {
+    return 'Todavía no hay ninguna versión publicada en GitHub Releases para revisar. Esto es normal si nunca has corrido "npm run release" — no afecta el uso normal de la app.';
+  }
+  if (msg.includes('net::ERR_INTERNET_DISCONNECTED') || msg.includes('ENOTFOUND') || msg.includes('ETIMEDOUT')) {
+    return 'No hay conexión a internet en este momento — se volverá a revisar la próxima vez que abras la app.';
+  }
+  return 'No se pudo revisar actualizaciones. Se guardó el detalle técnico en el registro (Configuración → Soporte y Diagnóstico).';
+}
 
 function buscarActualizaciones() {
   if (isDev) return;
