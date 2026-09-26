@@ -113,6 +113,7 @@ contextBridge.exposeInMainWorld('api', {
     abrirLogs: invoke('config:abrirLogs'),
     exportDb: invoke('config:exportDb'),
     importDb: invoke('config:importDb'),
+    eliminarBaseDatos: invoke('config:eliminarBaseDatos'),
     getNegocio: invoke('config:getNegocio'),
     getSupabaseConfig: invoke('config:getSupabaseConfig'),
     setSupabaseConfig: invoke('config:setSupabaseConfig'),
