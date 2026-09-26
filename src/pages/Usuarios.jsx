@@ -10,12 +10,13 @@ export default function Usuarios() {
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState('');
+  const [mostrarPassword, setMostrarPassword] = useState(false);
 
   async function load() { setRows(await window.api.usuarios.list()); }
   useEffect(() => { load(); }, []);
 
-  function openNew() { setForm(emptyForm); setError(''); setModalOpen(true); }
-  function openEdit(u) { setForm({ ...u, password: '' }); setError(''); setModalOpen(true); }
+  function openNew() { setForm(emptyForm); setError(''); setMostrarPassword(false); setModalOpen(true); }
+  function openEdit(u) { setForm({ ...u, password: '' }); setError(''); setMostrarPassword(false); setModalOpen(true); }
 
   async function save() {
     if (!form.nombre.trim() || !form.email.trim()) { setError('Nombre y correo son requeridos.'); return; }
@@ -72,7 +73,14 @@ export default function Usuarios() {
             </select>
           </div>
         </div>
-        <div className="form-group"><label>Contraseña {form.id ? '(dejar vacío para no cambiar)' : '(requerida)'}</label><input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></div>
+        <div className="form-group">
+          <label>Contraseña {form.id ? '(dejar vacío para no cambiar)' : '(requerida)'}</label>
+          <input type={mostrarPassword ? 'text' : 'password'} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, textTransform: 'none', fontSize: 11, fontWeight: 400, cursor: 'pointer' }}>
+            <input type="checkbox" checked={mostrarPassword} onChange={() => setMostrarPassword((v) => !v)} style={{ width: 'auto' }} />
+            Mostrar contraseña
+          </label>
+        </div>
       </Modal>
     </div>
   );

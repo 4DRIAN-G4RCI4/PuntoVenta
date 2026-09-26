@@ -6,6 +6,11 @@ export default function Login({ onLogin, negocio }) {
   const [mostrarPassword, setMostrarPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [bdEliminada] = useState(() => {
+    const fue = sessionStorage.getItem('pvp_bd_eliminada') === '1';
+    if (fue) sessionStorage.removeItem('pvp_bd_eliminada');
+    return fue;
+  });
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -27,6 +32,11 @@ export default function Login({ onLogin, negocio }) {
         )}
         <div className="login-title">Punto<span>Venta</span></div>
         <div className="login-sub">{negocio?.nombre_negocio || 'Poblano'} — Gestión Integral</div>
+        {bdEliminada && (
+          <div className="alert alert-info" style={{ marginBottom: 14 }}>
+            La base de datos local se eliminó correctamente. Vuelve a iniciar sesión con las credenciales que se te dieron al instalar.
+          </div>
+        )}
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label>Correo electrónico</label>

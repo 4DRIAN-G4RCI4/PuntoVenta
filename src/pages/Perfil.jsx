@@ -10,6 +10,7 @@ export default function Perfil() {
   const [current, setCurrent] = useState('');
   const [nueva, setNueva] = useState('');
   const [pwMsg, setPwMsg] = useState('');
+  const [mostrarPassword, setMostrarPassword] = useState(false);
 
   const [nombreNegocio, setNombreNegocio] = useState(negocio?.nombre_negocio || '');
   const [logoPreview, setLogoPreview] = useState(negocio?.logo || null);
@@ -70,8 +71,15 @@ export default function Perfil() {
             <div className="card" data-tour="perfil-password">
               <div className="card-title">Cambiar Contraseña</div>
               {pwMsg && <div className={'alert ' + (pwMsg.includes('actualizada') ? 'alert-success' : 'alert-error')}>{pwMsg}</div>}
-              <div className="form-group"><label>Contraseña Actual</label><input type="password" value={current} onChange={(e) => setCurrent(e.target.value)} /></div>
-              <div className="form-group"><label>Nueva Contraseña</label><input type="password" value={nueva} onChange={(e) => setNueva(e.target.value)} /></div>
+              <div className="form-group"><label>Contraseña Actual</label><input type={mostrarPassword ? 'text' : 'password'} value={current} onChange={(e) => setCurrent(e.target.value)} /></div>
+              <div className="form-group">
+                <label>Nueva Contraseña</label>
+                <input type={mostrarPassword ? 'text' : 'password'} value={nueva} onChange={(e) => setNueva(e.target.value)} />
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, textTransform: 'none', fontSize: 11, fontWeight: 400, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={mostrarPassword} onChange={() => setMostrarPassword((v) => !v)} style={{ width: 'auto' }} />
+                  Mostrar contraseñas
+                </label>
+              </div>
               <button className="btn btn-primary" onClick={changePassword}>Actualizar Contraseña</button>
             </div>
           ) : (
