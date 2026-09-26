@@ -1249,6 +1249,27 @@ function register(mainWindow, actualizaciones = {}) {
     } catch (e) { return err(e.message); }
   }));
 
+  // Borra por completo la base de datos LOCAL (SQLite) y la reemplaza por una
+  // vacía recién sembrada — nunca toca Supabase/la nube. Exige la contraseña
+  // del admin que lo pide (defensa extra más allá de los dos pasos que ya
+  // hace la pantalla en el renderer: escribir "ELIMINAR" + una segunda
+  // pantalla de confirmación) — irreversible, no hay deshacer.
+  ipcMain.handle('config:eliminarBaseDatos', proteger(ROLES.ADMIN, (event, { password } = {}, s) => {
+    const user = db().prepare('SELECT password FROM usuarios WHERE id=?').get(s.id);
+    if (!user || !bcrypt.compareSync(password || '', user.password)) return err('Contraseña incorrecta.');
+    try {
+      const dbPath = getDbPath();
+      const dbInstanceActual = db();
+      try { dbInstanceActual.close(); } catch (_e) {}
+      for (const suf of ['', '-wal', '-shm']) {
+        try { fs.unlinkSync(dbPath + suf); } catch (_e) {}
+      }
+      reopenDatabase(dbPath);
+      sesiones.clear();
+      return ok();
+    } catch (e) { return err(e.message); }
+  }));
+
   // ── IMPRESORAS TÉRMICAS Y ESCÁNERES ──────────────────────────
   // Los escáneres de código de barras (USB/Bluetooth "keyboard wedge") no
   // requieren driver ni integración especial: se comportan como un teclado

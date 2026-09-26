@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ACENTOS, useAcento } from '../hooks/useAcento.js';
+import Modal from '../components/Modal.jsx';
 
 export default function Configuracion() {
   const [acento, setAcento] = useAcento();
@@ -23,6 +24,48 @@ export default function Configuracion() {
   const [supabaseUrl, setSupabaseUrl] = useState('');
   const [supabaseAnonKey, setSupabaseAnonKey] = useState('');
   const [supabaseProyectoMsg, setSupabaseProyectoMsg] = useState('');
+
+  // Eliminar base de datos local — dos pantallas de confirmación a propósito:
+  // 1) escribir "ELIMINAR" tal cual, 2) contraseña del admin. Irreversible.
+  const [eliminarPaso, setEliminarPaso] = useState(0); // 0=cerrado, 1=escribir texto, 2=contraseña
+  const [eliminarTexto, setEliminarTexto] = useState('');
+  const [eliminarPassword, setEliminarPassword] = useState('');
+  const [eliminarError, setEliminarError] = useState('');
+  const [eliminando, setEliminando] = useState(false);
+
+  function abrirEliminarBD() {
+    setEliminarPaso(1);
+    setEliminarTexto('');
+    setEliminarPassword('');
+    setEliminarError('');
+  }
+  function cerrarEliminarBD() {
+    setEliminarPaso(0);
+    setEliminarTexto('');
+    setEliminarPassword('');
+    setEliminarError('');
+  }
+  function continuarAPaso2() {
+    if (eliminarTexto.trim() !== 'ELIMINAR') { setEliminarError('Escribe exactamente ELIMINAR (en mayúsculas) para continuar.'); return; }
+    setEliminarError('');
+    setEliminarPaso(2);
+  }
+  async function confirmarEliminarBD() {
+    if (!eliminarPassword) { setEliminarError('Ingresa tu contraseña.'); return; }
+    setEliminando(true);
+    setEliminarError('');
+    const res = await window.api.config.eliminarBaseDatos({ password: eliminarPassword });
+    if (!res.ok) {
+      setEliminando(false);
+      setEliminarError(res.error || 'No se pudo eliminar la base de datos.');
+      return;
+    }
+    // La base quedó vacía y recién sembrada; hay que salir de la sesión
+    // actual (ese usuario ya no existe tal cual) y recargar desde cero.
+    await window.api.auth.logout().catch(() => {});
+    sessionStorage.removeItem('pvp_user');
+    window.location.reload();
+  }
 
   async function cargarEstadoSync() {
     const r = await window.api.sync.estado();
@@ -323,7 +366,7 @@ export default function Configuracion() {
 
         {msg && <div className="alert alert-info">{msg}</div>}
 
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <button className="btn btn-primary" onClick={exportar}>Exportar base de datos</button>
           <button className="btn btn-danger" onClick={importar}>Importar base de datos</button>
         </div>
@@ -331,7 +374,46 @@ export default function Configuracion() {
           Exportar crea una copia del archivo .db actual en la ubicación que elijas.
           Importar reemplaza la base de datos activa con un archivo .db seleccionado — esta acción es destructiva y no se puede deshacer.
         </p>
+
+        <div style={{ borderTop: '1px solid var(--border)', marginTop: 18, paddingTop: 16 }}>
+          <button className="btn btn-danger" onClick={abrirEliminarBD}>Eliminar base de datos</button>
+          <p style={{ color: 'var(--muted)', fontSize: 11, marginTop: 10 }}>
+            Borra TODO lo que hay en la base de datos local (ventas, productos, clientes, todo) y la deja como recién instalada. Solo afecta esta computadora — nunca toca lo que ya subiste a Supabase/la app móvil. No se puede deshacer.
+          </p>
+        </div>
       </div>
+
+      <Modal open={eliminarPaso === 1} onClose={cerrarEliminarBD} title="Eliminar base de datos — paso 1 de 2">
+        <div className="alert alert-error" style={{ marginBottom: 14 }}>
+          Esto borra TODA la información local: ventas, productos, clientes, gastos, cortes de caja, todo. No hay forma de deshacerlo.
+        </div>
+        {eliminarError && <div className="alert alert-error">{eliminarError}</div>}
+        <div className="form-group">
+          <label>Escribe ELIMINAR para continuar</label>
+          <input value={eliminarTexto} onChange={(e) => setEliminarTexto(e.target.value)} autoFocus placeholder="ELIMINAR" />
+        </div>
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 10 }}>
+          <button className="btn btn-secondary" onClick={cerrarEliminarBD}>Cancelar</button>
+          <button className="btn btn-danger" onClick={continuarAPaso2} disabled={eliminarTexto.trim() !== 'ELIMINAR'}>Continuar</button>
+        </div>
+      </Modal>
+
+      <Modal open={eliminarPaso === 2} onClose={cerrarEliminarBD} title="Eliminar base de datos — paso 2 de 2">
+        <div className="alert alert-error" style={{ marginBottom: 14 }}>
+          Última confirmación. Ingresa tu contraseña para borrar la base de datos local de forma permanente.
+        </div>
+        {eliminarError && <div className="alert alert-error">{eliminarError}</div>}
+        <div className="form-group">
+          <label>Tu contraseña</label>
+          <input type="password" value={eliminarPassword} onChange={(e) => setEliminarPassword(e.target.value)} autoFocus />
+        </div>
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 10 }}>
+          <button className="btn btn-secondary" onClick={cerrarEliminarBD} disabled={eliminando}>Cancelar</button>
+          <button className="btn btn-danger" onClick={confirmarEliminarBD} disabled={eliminando}>
+            {eliminando ? 'Eliminando...' : 'Sí, eliminar todo'}
+          </button>
+        </div>
+      </Modal>
 
       <div className="card" data-tour="config-updates">
         <div className="card-title">Actualizaciones</div>
