@@ -37,7 +37,7 @@
   },
   "build": {
     "appId": "com.puntofamily.puntoventa",
-    "productName": "Punto Venta Poblano",
+    "productName": "Punto de Venta",
     "directories": {
       "output": "dist-installer"
     },
@@ -53,6 +53,7 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
     },
+    "compression": "normal",
     "publish": {
       "provider": "github",
       "owner": "4DRIAN-G4RCI4",
