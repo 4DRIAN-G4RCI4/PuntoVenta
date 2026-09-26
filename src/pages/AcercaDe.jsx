@@ -16,13 +16,20 @@ export default function AcercaDe() {
       </div>
 
       <div className="card" data-tour="acerca-puntotec">
-        <div className="card-title">Desarrollado por <span style={{ color: 'var(--accent)' }}>PuntoTec</span></div>
+        <div className="card-title">Desarrollado por <span style={{ color: 'var(--accent)' }}>Tecnopriv</span></div>
         <p style={{ color: 'var(--muted)', fontSize: 13, lineHeight: 1.6 }}>
-          PuntoTec desarrolla software de punto de venta a la medida para todo tipo de
+          Tecnopriv desarrolla software de punto de venta a la medida para todo tipo de
           negocios y servicios — tiendas, restaurantes, talleres, salones y más — combinando
           una aplicación de escritorio robusta que funciona sin depender de internet con
           herramientas en la nube y una app móvil para que siempre tengas tu negocio a la mano.
         </p>
+        <a
+          href="#"
+          onClick={(e) => { e.preventDefault(); window.api.config.abrirEnlaceExterno('https://tecnopriv.online'); }}
+          style={{ color: 'var(--accent)', fontSize: 13 }}
+        >
+          tecnopriv.online
+        </a>
       </div>
 
       <div className="card">
