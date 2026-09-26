@@ -30,6 +30,7 @@ export default function Configuracion() {
   const [eliminarPaso, setEliminarPaso] = useState(0); // 0=cerrado, 1=escribir texto, 2=contraseña
   const [eliminarTexto, setEliminarTexto] = useState('');
   const [eliminarPassword, setEliminarPassword] = useState('');
+  const [mostrarEliminarPassword, setMostrarEliminarPassword] = useState(false);
   const [eliminarError, setEliminarError] = useState('');
   const [eliminando, setEliminando] = useState(false);
 
@@ -37,12 +38,14 @@ export default function Configuracion() {
     setEliminarPaso(1);
     setEliminarTexto('');
     setEliminarPassword('');
+    setMostrarEliminarPassword(false);
     setEliminarError('');
   }
   function cerrarEliminarBD() {
     setEliminarPaso(0);
     setEliminarTexto('');
     setEliminarPassword('');
+    setMostrarEliminarPassword(false);
     setEliminarError('');
   }
   function continuarAPaso2() {
@@ -62,8 +65,11 @@ export default function Configuracion() {
     }
     // La base quedó vacía y recién sembrada; hay que salir de la sesión
     // actual (ese usuario ya no existe tal cual) y recargar desde cero.
+    // Se avisa en la pantalla de login (vía sessionStorage) porque para
+    // cuando recarga ya no hay sesión ni esta pantalla de Configuración.
     await window.api.auth.logout().catch(() => {});
     sessionStorage.removeItem('pvp_user');
+    sessionStorage.setItem('pvp_bd_eliminada', '1');
     window.location.reload();
   }
 
@@ -405,7 +411,21 @@ export default function Configuracion() {
         {eliminarError && <div className="alert alert-error">{eliminarError}</div>}
         <div className="form-group">
           <label>Tu contraseña</label>
-          <input type="password" value={eliminarPassword} onChange={(e) => setEliminarPassword(e.target.value)} autoFocus />
+          <input
+            type={mostrarEliminarPassword ? 'text' : 'password'}
+            value={eliminarPassword}
+            onChange={(e) => setEliminarPassword(e.target.value)}
+            autoFocus
+          />
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, textTransform: 'none', fontSize: 11, fontWeight: 400, cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={mostrarEliminarPassword}
+              onChange={() => setMostrarEliminarPassword((v) => !v)}
+              style={{ width: 'auto' }}
+            />
+            Mostrar contraseña
+          </label>
         </div>
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 10 }}>
           <button className="btn btn-secondary" onClick={cerrarEliminarBD} disabled={eliminando}>Cancelar</button>
