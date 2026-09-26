@@ -111,6 +111,7 @@ contextBridge.exposeInMainWorld('api', {
   config: {
     dbInfo: invoke('config:dbInfo'),
     abrirLogs: invoke('config:abrirLogs'),
+    abrirEnlaceExterno: invoke('config:abrirEnlaceExterno'),
     exportDb: invoke('config:exportDb'),
     importDb: invoke('config:importDb'),
     eliminarBaseDatos: invoke('config:eliminarBaseDatos'),

@@ -1190,6 +1190,15 @@ function register(mainWindow, actualizaciones = {}) {
     return ok({ path: carpeta });
   }));
 
+  // Solo abre en el navegador externo — nunca navegación dentro de la app
+  // (ver will-navigate en main.js). Whitelist fija para no abrir cualquier URL.
+  const ENLACES_PERMITIDOS = ['https://tecnopriv.online'];
+  ipcMain.handle('config:abrirEnlaceExterno', proteger(ROLES.ANY, (_e, url) => {
+    if (!ENLACES_PERMITIDOS.includes(url)) return err('Enlace no permitido.');
+    shell.openExternal(url);
+    return ok();
+  }));
+
   // ── ACTUALIZACIONES (GitHub Releases, ver "publish" en package.json) ──
   // Cualquier rol autenticado puede VER el estado y reiniciar para instalar
   // (es información inofensiva y una acción que no expone datos del negocio) —
