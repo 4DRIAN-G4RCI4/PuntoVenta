@@ -26,6 +26,7 @@ function openDatabase(targetPath) {
   db.prepare(`INSERT OR IGNORE INTO app_config (id, nombre_negocio) VALUES (1, 'Poblano')`).run();
 
   // Migraciones ligeras: agrega columnas nuevas a instalaciones existentes.
+  ensureColumn(db, 'app_config', 'tipo_negocio', "TEXT NOT NULL DEFAULT 'general'");
   ensureColumn(db, 'app_config', 'impresora_ticket', 'TEXT');
   ensureColumn(db, 'app_config', 'ancho_papel', "TEXT DEFAULT '80mm'");
   ensureColumn(db, 'app_config', 'supabase_url', 'TEXT');
