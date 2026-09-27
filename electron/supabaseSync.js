@@ -36,7 +36,8 @@ function credencialesSupabase() {
 
 const PK = {
   ventas_resumen: 'id', gastos_resumen: 'id', stock_alertas: 'presentacion_id', negocio: 'id',
-  inventario_resumen: 'presentacion_id', cortes_resumen: 'id', creditos_resumen: 'venta_id', devoluciones_resumen: 'id'
+  inventario_resumen: 'presentacion_id', cortes_resumen: 'id', creditos_resumen: 'venta_id', devoluciones_resumen: 'id',
+  productos_completo: 'id'
 };
 
 let accessToken = null;
@@ -213,6 +214,26 @@ function encolarVenta(ventaId) {
   });
 }
 
+/** Respaldo completo de un producto (todos los campos, no solo lo mínimo para el
+ * celular) — para poder reconstruir el catálogo si la base local se pierde. */
+function encolarProductoCompleto(productoId) {
+  const p = db().prepare(`
+    SELECT pr.*, c.nombre as categoria_nombre FROM productos pr
+    LEFT JOIN categorias c ON c.id = pr.categoria_id WHERE pr.id=?
+  `).get(productoId);
+  if (!p) return;
+  if (!p.activo) { encolar('productos_completo', 'delete', { id: p.id }); return; }
+  encolar('productos_completo', 'upsert', {
+    id: p.id, sku: p.sku, codigo_barras: p.codigo_barras, nombre: p.nombre, descripcion: p.descripcion,
+    categoria: p.categoria_nombre || null, departamento: p.departamento, marca: p.marca, modelo: p.modelo,
+    color: p.color, material: p.material, costo_unitario: p.costo_unitario, precio_publico: p.precio_publico,
+    iva: p.iva, activo: !!p.activo, principio_activo: p.principio_activo, laboratorio: p.laboratorio,
+    forma_farmaceutica: p.forma_farmaceutica, registro_sanitario: p.registro_sanitario,
+    requiere_receta: !!p.requiere_receta, sustancia_controlada: !!p.sustancia_controlada, maneja_lotes: !!p.maneja_lotes,
+    actualizado_en: new Date().toISOString()
+  });
+}
+
 function encolarGasto(gastoId) {
   const g = db().prepare('SELECT id, concepto, monto, categoria, fecha FROM gastos WHERE id=?').get(gastoId);
   if (!g) return;
@@ -240,10 +261,12 @@ function encolarTodoHistorico() {
   for (const v of creditos) encolarCredito(v.id);
   const devoluciones = db().prepare('SELECT id FROM devoluciones').all();
   for (const d of devoluciones) encolarDevolucion(d.id);
+  const productos = db().prepare('SELECT id FROM productos WHERE activo=1').all();
+  for (const p of productos) encolarProductoCompleto(p.id);
   encolarNegocio();
   return {
     ventas: ventas.length, gastos: gastos.length, presentaciones: presentaciones.length,
-    cortes: cortes.length, creditos: creditos.length, devoluciones: devoluciones.length
+    cortes: cortes.length, creditos: creditos.length, devoluciones: devoluciones.length, productos: productos.length
   };
 }
 
@@ -424,6 +447,6 @@ function obtenerEstado() {
 module.exports = {
   configurarSync, desconectarSync, estaConfigurado, obtenerEstado,
   encolarVenta, encolarGasto, encolarNegocio, evaluarYEncolarStock, encolarTodoHistorico,
-  encolarCorte, encolarCredito, encolarDevolucion,
+  encolarCorte, encolarCredito, encolarDevolucion, encolarProductoCompleto,
   procesarCola, vaciarColaCompleta, solicitarCancelacion, iniciarLoop
 };
