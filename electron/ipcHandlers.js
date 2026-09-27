@@ -24,7 +24,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 const bcrypt = require('bcryptjs');
-const { getDb, getDbPath, reopenDatabase, generateFolio } = require('./db');
+const { getDb, getDbPath, reopenDatabase, generateFolio, generarLlaveRecuperacion } = require('./db');
 const sync = require('./supabaseSync');
 const { seleccionarLotesFEFO, aplicarDeducciones, reconciliarStockPresentacion, calcularReversionDevolucion } = require('./logicaFarmacia');
 
@@ -157,6 +157,35 @@ function register(mainWindow, actualizaciones = {}) {
     const user = db().prepare('SELECT debe_cambiar_password FROM usuarios WHERE id=?').get(s.id);
     if (!user || !user.debe_cambiar_password) return err('No tienes un cambio de contraseña pendiente.');
     db().prepare('UPDATE usuarios SET password=?, debe_cambiar_password=0 WHERE id=?').run(bcrypt.hashSync(newPassword, 10), s.id);
+    return ok();
+  });
+
+  // Recuperación de acceso cuando el admin olvida su contraseña y no hay otro
+  // admin que se la resetee. Requiere la llave de recuperación de ESTA instalación
+  // (única por instalación, mostrada al crear la base y disponible después en
+  // Configuración → Cuenta). A propósito NO requiere sesión — es justo para cuando
+  // nadie puede entrar. Tras usarse, la llave se invalida y se genera una nueva.
+  const intentosRecuperacion = new Map(); // email -> { count, hasta }
+  ipcMain.handle('auth:recuperarAcceso', (event, { llave, email, newPassword } = {}) => {
+    const correo = String(email || '').trim().toLowerCase();
+    if (!esTextoValido(llave, { min: 1, max: 40 })) return err('Ingresa la llave de recuperación.');
+    if (!correo) return err('Ingresa el correo del administrador.');
+    if (!esTextoValido(newPassword, { min: 8, max: 200 })) return err('La nueva contraseña debe tener al menos 8 caracteres.');
+
+    const intento = intentosRecuperacion.get(correo);
+    if (intento && intento.count >= 5 && Date.now() < intento.hasta) return err('Demasiados intentos. Intenta de nuevo en unos minutos.');
+
+    const cfg = db().prepare('SELECT recovery_key_hash FROM app_config WHERE id=1').get();
+    if (!cfg?.recovery_key_hash || !bcrypt.compareSync(llave.trim(), cfg.recovery_key_hash)) {
+      intentosRecuperacion.set(correo, { count: (intento?.count || 0) + 1, hasta: Date.now() + 5 * 60 * 1000 });
+      return err('Llave de recuperación incorrecta.');
+    }
+    const user = db().prepare("SELECT id FROM usuarios WHERE lower(email)=? AND rol='admin' AND activo=1").get(correo);
+    if (!user) return err('No hay ningún administrador activo con ese correo.');
+
+    intentosRecuperacion.delete(correo);
+    db().prepare('UPDATE usuarios SET password=?, debe_cambiar_password=0 WHERE id=?').run(bcrypt.hashSync(newPassword, 10), user.id);
+    generarLlaveRecuperacion(db());
     return ok();
   });
 
@@ -1299,6 +1328,23 @@ function register(mainWindow, actualizaciones = {}) {
       sesiones.clear();
       return ok();
     } catch (e) { return err(e.message); }
+  }));
+
+  // Llave de recuperación de acceso: se pide la contraseña actual como
+  // confirmación (misma razón que eliminar BD — es información sensible,
+  // cualquiera con esta llave puede resetear al admin) y devuelve la llave
+  // EN CLARO solo esta vez para que se muestre en pantalla; nunca se guarda
+  // ni se puede volver a consultar sin regenerarla de nuevo.
+  ipcMain.handle('config:regenerarLlaveRecuperacion', proteger(ROLES.ADMIN, (event, { password } = {}, s) => {
+    const user = db().prepare('SELECT password FROM usuarios WHERE id=?').get(s.id);
+    if (!user || !bcrypt.compareSync(password || '', user.password)) return err('Contraseña incorrecta.');
+    const llave = generarLlaveRecuperacion(db());
+    return ok({ llave });
+  }));
+
+  ipcMain.handle('config:tieneLlaveRecuperacion', proteger(ROLES.ADMIN, () => {
+    const cfg = db().prepare('SELECT recovery_key_hash FROM app_config WHERE id=1').get();
+    return ok({ tiene: !!cfg?.recovery_key_hash });
   }));
 
   // ── IMPRESORAS TÉRMICAS Y ESCÁNERES ──────────────────────────

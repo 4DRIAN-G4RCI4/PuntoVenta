@@ -34,6 +34,7 @@ function openDatabase(targetPath) {
   ensureColumn(db, 'app_config', 'supabase_refresh_token', 'TEXT');
   ensureColumn(db, 'app_config', 'supabase_email', 'TEXT');
   ensureColumn(db, 'app_config', 'supabase_ultimo_sync', 'TEXT');
+  ensureColumn(db, 'app_config', 'recovery_key_hash', 'TEXT');
 
   // Campos para negocios que venden productos regulados/perecederos (ej. farmacias).
   ensureColumn(db, 'productos', 'principio_activo', 'TEXT');
@@ -51,9 +52,26 @@ function openDatabase(targetPath) {
 
   if (isNew) seed(db);
 
+  // Instalaciones que se actualizan desde una versión sin llave de recuperación
+  // también necesitan una — si no, quedarían sin forma de recuperar el acceso.
+  const cfg = db.prepare('SELECT recovery_key_hash FROM app_config WHERE id=1').get();
+  if (cfg && !cfg.recovery_key_hash) generarLlaveRecuperacion(db);
+
   dbInstance = db;
   dbPath = targetPath;
   return db;
+}
+
+/** Genera una nueva llave de recuperación (formato PVP-XXXX-XXXX-XXXX), la guarda
+ * hasheada (nunca en texto plano) y devuelve la llave en claro UNA sola vez — quien
+ * llama debe mostrarla al admin de inmediato, porque después no se puede recuperar. */
+function generarLlaveRecuperacion(db) {
+  const bcrypt = require('bcryptjs');
+  const alfabeto = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sin 0/O/1/I, se confunden al transcribir
+  const grupo = () => Array.from({ length: 4 }, () => alfabeto[Math.floor(Math.random() * alfabeto.length)]).join('');
+  const llave = `PVP-${grupo()}-${grupo()}-${grupo()}`;
+  db.prepare('UPDATE app_config SET recovery_key_hash=? WHERE id=1').run(bcrypt.hashSync(llave, 10));
+  return llave;
 }
 
 function tablaExiste(db, tabla) {
@@ -153,6 +171,8 @@ function seed(db) {
   const insCli = db.prepare(`INSERT INTO clientes (nombre, apellido, telefono, email, limite_credito) VALUES (?,?,?,?,?)`);
   insCli.run('Juan', 'Pérez', '7351234567', 'juan.perez@example.com', 3000);
   insCli.run('María', 'López', '7359876543', 'maria.lopez@example.com', 5000);
+
+  generarLlaveRecuperacion(db);
 }
 
-module.exports = { openDatabase, getDb, getDbPath, reopenDatabase, generateFolio };
+module.exports = { openDatabase, getDb, getDbPath, reopenDatabase, generateFolio, generarLlaveRecuperacion };
