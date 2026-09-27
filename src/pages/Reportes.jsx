@@ -285,7 +285,8 @@ export default function Reportes() {
           <input type="date" value={fi} onChange={(e) => setFi(e.target.value)} style={{ width: 'auto' }} />
           <span style={{ color: 'var(--muted)' }}>—</span>
           <input type="date" value={ff} onChange={(e) => setFf(e.target.value)} style={{ width: 'auto' }} />
-          <button data-tour="reportes-exportar" className="btn btn-secondary btn-sm" style={{ marginLeft: 'auto' }} onClick={handleExportarCSV}>Exportar CSV</button>
+          <span style={{ marginLeft: 'auto', color: 'var(--muted)', fontSize: 12 }}>Exportar «{TITULOS[tab]}»:</span>
+          <button data-tour="reportes-exportar" className="btn btn-secondary btn-sm" onClick={handleExportarCSV}>Exportar CSV</button>
           <button className="btn btn-primary btn-sm" onClick={handleExportarPDF} disabled={exportandoPdf}>
             {exportandoPdf ? 'Generando PDF...' : 'Exportar PDF'}
           </button>
