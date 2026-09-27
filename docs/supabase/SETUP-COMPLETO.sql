@@ -3,11 +3,12 @@
 --
 -- Para un proyecto de Supabase NUEVO. Copia y pega TODO este archivo en
 -- el SQL Editor de tu proyecto (Supabase → SQL Editor → New query) y
--- dale "Run" una sola vez. Crea las 8 tablas que la app móvil necesita
--- para mostrar ventas, stock, gastos, inventario, cortes de caja,
--- créditos y devoluciones — es un espejo RESUMIDO de la base de datos
--- local (SQLite) de la computadora. Nunca se sube nada de contraseñas
--- ni datos sensibles de más.
+-- dale "Run" una sola vez. Crea las 9 tablas que necesita la app móvil
+-- (ventas, stock, gastos, inventario, cortes de caja, créditos y
+-- devoluciones — un espejo RESUMIDO de la base local) más un respaldo
+-- COMPLETO de productos (productos_completo, con todos los campos,
+-- incluidos los de farmacia). Nunca se sube nada de contraseñas ni
+-- datos sensibles de más.
 --
 -- Seguro de correr más de una vez: todo usa "if not exists" / "drop
 -- policy if exists" antes de crear, así que no truena si ya lo corriste.
@@ -119,6 +120,38 @@ create table if not exists devoluciones_resumen (
   creado_en timestamptz not null default now()
 );
 
+-- ── 9. Respaldo completo de productos ───────────────────────────────
+-- A diferencia de inventario_resumen (que solo trae lo mínimo para el
+-- celular), esta es una copia FIEL de cada producto tal como está en la
+-- base local — todos los campos, incluidos los de farmacia. Sirve como
+-- respaldo real: si la computadora se pierde o se corrompe, aquí está
+-- el catálogo completo para reconstruirlo, no solo nombre/precio/stock.
+create table if not exists productos_completo (
+  id bigint primary key,
+  sku text,
+  codigo_barras text,
+  nombre text not null,
+  descripcion text,
+  categoria text,
+  departamento text,
+  marca text,
+  modelo text,
+  color text,
+  material text,
+  costo_unitario numeric default 0,
+  precio_publico numeric default 0,
+  iva numeric default 16,
+  activo boolean default true,
+  principio_activo text,
+  laboratorio text,
+  forma_farmaceutica text,
+  registro_sanitario text,
+  requiere_receta boolean default false,
+  sustancia_controlada boolean default false,
+  maneja_lotes boolean default false,
+  actualizado_en timestamptz not null default now()
+);
+
 -- ================================================================
 -- SEGURIDAD (RLS) — mismo modelo para las 8 tablas:
 --   - Cualquier usuario autenticado puede LEER (así lo consulta el celular).
@@ -135,7 +168,8 @@ declare
   t text;
 begin
   foreach t in array array['negocio','ventas_resumen','stock_alertas','gastos_resumen',
-                            'inventario_resumen','cortes_resumen','creditos_resumen','devoluciones_resumen']
+                            'inventario_resumen','cortes_resumen','creditos_resumen','devoluciones_resumen',
+                            'productos_completo']
   loop
     execute format('alter table %I enable row level security', t);
 
@@ -152,10 +186,11 @@ begin
 end $$;
 
 -- ── Verificación — debes ver 4 filas (select/insert/update/delete) por
--- cada una de las 8 tablas = 32 filas en total. Si falta alguna, algo no
+-- cada una de las 9 tablas = 36 filas en total. Si falta alguna, algo no
 -- se creó bien y hay que revisar el mensaje de error de arriba.
 select tablename, policyname, cmd, roles
 from pg_policies
 where tablename in ('negocio','ventas_resumen','stock_alertas','gastos_resumen',
-                     'inventario_resumen','cortes_resumen','creditos_resumen','devoluciones_resumen')
+                     'inventario_resumen','cortes_resumen','creditos_resumen','devoluciones_resumen',
+                     'productos_completo')
 order by tablename, cmd;

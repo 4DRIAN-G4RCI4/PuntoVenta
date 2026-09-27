@@ -416,6 +416,7 @@ function register(mainWindow, actualizaciones = {}) {
           .run(p.nombre.trim(), limpiar(p.descripcion, 500), p.categoria_id || null, limpiar(p.departamento, 80), limpiar(p.marca, 80), limpiar(p.modelo, 80), limpiar(p.color, 60), limpiar(p.material, 60), p.costo_unitario || 0, p.precio_publico || 0, p.codigo_barras ? limpiar(p.codigo_barras, 64) : null,
             limpiar(p.principio_activo, 160) || null, limpiar(p.laboratorio, 120) || null, limpiar(p.forma_farmaceutica, 80) || null, limpiar(p.registro_sanitario, 80) || null,
             requiereReceta, sustanciaControlada, iva, manejaLotes, p.id);
+        sync.encolarProductoCompleto(p.id);
         return ok({ id: p.id });
       } else {
         const prefix = limpiar(p.departamento || 'GEN', 3).slice(0, 3).toUpperCase() || 'GEN';
@@ -455,6 +456,7 @@ function register(mainWindow, actualizaciones = {}) {
             }
           }
         }
+        sync.encolarProductoCompleto(newId);
         return ok({ id: newId, sku });
       }
     } catch (e) {
@@ -466,6 +468,7 @@ function register(mainWindow, actualizaciones = {}) {
   ipcMain.handle('productos:delete', proteger(ROLES.ALMACEN, (event, { id } = {}) => {
     if (!esEnteroValido(id, { min: 1 })) return err('Producto inválido.');
     db().prepare('UPDATE productos SET activo=0 WHERE id=?').run(id);
+    sync.encolarProductoCompleto(id);
     return ok();
   }));
 
