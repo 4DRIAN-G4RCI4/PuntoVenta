@@ -1234,6 +1234,11 @@ function register(mainWindow, actualizaciones = {}) {
   // ── CONFIGURACIÓN: EXPORTAR / IMPORTAR BASE DE DATOS (solo admin) ─
   ipcMain.handle('config:dbInfo', proteger(ROLES.ADMIN, () => ({ path: getDbPath() })));
 
+  // Lectura pública (Acerca de es visible para cualquier rol) — la versión
+  // real de package.json, para no tener que actualizar el texto a mano en
+  // cada release y que "Acerca de" se desactualice como pasaba antes.
+  ipcMain.handle('config:getVersion', () => ok({ version: app.getVersion() }));
+
   ipcMain.handle('config:abrirLogs', proteger(ROLES.ADMIN, async () => {
     const carpeta = path.join(app.getPath('userData'), 'logs');
     const error = await shell.openPath(carpeta);
