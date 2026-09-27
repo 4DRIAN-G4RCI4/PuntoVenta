@@ -379,7 +379,9 @@ function register(mainWindow, actualizaciones = {}) {
   ipcMain.handle('productos:list', proteger(ROLES.ALMACEN, (event, { departamento, q, categoria_id } = {}) => {
     let sql = `SELECT p.*, c.nombre as cat_nombre,
         COALESCE((SELECT SUM(stock) FROM presentaciones t WHERE t.producto_id=p.id),0) as stock_total,
-        (SELECT COUNT(*) FROM presentaciones t WHERE t.producto_id=p.id) as num_presentaciones
+        (SELECT COUNT(*) FROM presentaciones t WHERE t.producto_id=p.id) as num_presentaciones,
+        (SELECT MIN(l.fecha_caducidad) FROM lotes l JOIN presentaciones t ON t.id=l.presentacion_id
+          WHERE t.producto_id=p.id AND l.cantidad > 0 AND l.fecha_caducidad IS NOT NULL) as proxima_caducidad
       FROM productos p LEFT JOIN categorias c ON c.id=p.categoria_id WHERE p.activo=1`;
     const params = [];
     if (departamento) { sql += ' AND p.departamento=?'; params.push(limpiar(departamento, 80)); }
@@ -436,9 +438,20 @@ function register(mainWindow, actualizaciones = {}) {
             // (con su caducidad) — nunca como número suelto, para que presentaciones.stock
             // y SUM(lotes.cantidad) nunca puedan desincronizarse desde el origen.
             const stockInicial = manejaLotes ? 0 : (esEnteroValido(t.stock, { min: 0, max: 1000000 }) ? t.stock : 0);
-            db().prepare('INSERT INTO presentaciones (producto_id, presentacion, stock) VALUES (?,?,?)').run(newId, t.presentacion.trim(), stockInicial);
+            const presInfo = db().prepare('INSERT INTO presentaciones (producto_id, presentacion, stock) VALUES (?,?,?)').run(newId, t.presentacion.trim(), stockInicial);
             if (stockInicial > 0) {
               db().prepare('INSERT INTO inventario_movimientos (producto_id, tipo, cantidad, motivo) VALUES (?,?,?,?)').run(newId, 'entrada', stockInicial, 'Registro inicial');
+            }
+            // Captura directa de caducidad al dar de alta (modo farmacia): evita el paso
+            // extra de guardar el producto y luego entrar a "Ver lotes" aparte.
+            if (manejaLotes && esEnteroValido(t.cantidad, { min: 1, max: 1000000 })) {
+              if (t.fecha_caducidad && isNaN(Date.parse(t.fecha_caducidad))) continue;
+              const presentacionId = presInfo.lastInsertRowid;
+              db().prepare('INSERT INTO lotes (presentacion_id, numero_lote, fecha_caducidad, cantidad) VALUES (?,?,?,?)')
+                .run(presentacionId, limpiar(t.numero_lote, 60) || null, t.fecha_caducidad || null, t.cantidad);
+              db().prepare('UPDATE presentaciones SET stock = ? WHERE id=?').run(t.cantidad, presentacionId);
+              db().prepare('INSERT INTO inventario_movimientos (producto_id, presentacion_id, tipo, cantidad, motivo) VALUES (?,?,?,?,?)')
+                .run(newId, presentacionId, 'entrada', t.cantidad, 'Registro inicial (lote)');
             }
           }
         }
@@ -1108,20 +1121,26 @@ function register(mainWindow, actualizaciones = {}) {
 
   // ── CONFIGURACIÓN: IDENTIDAD DEL NEGOCIO (nombre + logo/ícono) ──
   // Lectura pública (se necesita en la pantalla de login, antes de autenticar).
+  const TIPOS_NEGOCIO = ['general', 'farmacia'];
+
   ipcMain.handle('config:getNegocio', () => {
-    const row = db().prepare('SELECT nombre_negocio, logo FROM app_config WHERE id=1').get();
-    return ok(row || { nombre_negocio: 'Poblano', logo: null });
+    const row = db().prepare('SELECT nombre_negocio, logo, tipo_negocio FROM app_config WHERE id=1').get();
+    return ok(row || { nombre_negocio: 'Poblano', logo: null, tipo_negocio: 'general' });
   });
 
-  ipcMain.handle('config:setNegocio', proteger(ROLES.ADMIN, (event, { nombre_negocio, logo } = {}) => {
+  ipcMain.handle('config:setNegocio', proteger(ROLES.ADMIN, (event, { nombre_negocio, logo, tipo_negocio } = {}) => {
     if (nombre_negocio != null && !esTextoValido(nombre_negocio, { min: 1, max: 80 })) return err('El nombre del negocio debe tener entre 1 y 80 caracteres.');
     if (logo != null) {
       if (typeof logo !== 'string' || !logo.startsWith('data:image/')) return err('Formato de imagen inválido.');
       if (logo.length > 3_000_000) return err('La imagen es demasiado grande (máximo ~2MB).');
     }
+    if (tipo_negocio != null && !TIPOS_NEGOCIO.includes(tipo_negocio)) return err('Tipo de negocio inválido.');
     try {
       if (nombre_negocio != null) {
         db().prepare('UPDATE app_config SET nombre_negocio=? WHERE id=1').run(nombre_negocio.trim());
+      }
+      if (tipo_negocio != null) {
+        db().prepare('UPDATE app_config SET tipo_negocio=? WHERE id=1').run(tipo_negocio);
       }
       if (logo != null) {
         db().prepare('UPDATE app_config SET logo=? WHERE id=1').run(logo);
@@ -1132,7 +1151,7 @@ function register(mainWindow, actualizaciones = {}) {
           } catch (_e) {}
         }
       }
-      const row = db().prepare('SELECT nombre_negocio, logo FROM app_config WHERE id=1').get();
+      const row = db().prepare('SELECT nombre_negocio, logo, tipo_negocio FROM app_config WHERE id=1').get();
       sync.encolarNegocio();
       return ok(row);
     } catch (e) { return err(e.message); }

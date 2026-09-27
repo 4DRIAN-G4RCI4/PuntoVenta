@@ -174,6 +174,7 @@ CREATE TABLE IF NOT EXISTS gastos (
 CREATE TABLE IF NOT EXISTS app_config (
   id                       INTEGER PRIMARY KEY CHECK (id = 1),
   nombre_negocio           TEXT NOT NULL DEFAULT 'Poblano',
+  tipo_negocio             TEXT NOT NULL DEFAULT 'general',
   logo                     TEXT,
   impresora_ticket         TEXT,
   ancho_papel              TEXT DEFAULT '80mm',

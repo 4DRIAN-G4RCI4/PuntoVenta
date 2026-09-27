@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import Modal from '../components/Modal.jsx';
 import { money } from '../format.js';
+import { useAuth } from '../App.jsx';
 
 function diasParaCaducar(fechaIso) {
   if (!fechaIso) return null;
@@ -18,6 +19,8 @@ function colorCaducidad(fechaIso) {
 }
 
 export default function Inventario() {
+  const { negocio } = useAuth();
+  const esFarmacia = negocio?.tipo_negocio === 'farmacia';
   const [dept, setDept] = useState('');
   const [depts, setDepts] = useState([]);
   const [q, setQ] = useState('');
@@ -32,14 +35,16 @@ export default function Inventario() {
   const [newLote, setNewLote] = useState({ numero_lote: '', fecha_caducidad: '', cantidad: '' });
   const [error, setError] = useState('');
   const [erroresCampo, setErroresCampo] = useState({});
-  const emptyForm = {
-    id: 0, nombre: '', descripcion: '', categoria_id: '', departamento: '', marca: '', modelo: '', color: '', material: '', codigo_barras: '',
-    costo_unitario: '', precio_publico: '', iva: 16,
-    principio_activo: '', laboratorio: '', forma_farmaceutica: '', registro_sanitario: '',
-    requiere_receta: false, sustancia_controlada: false, maneja_lotes: false,
-    presentaciones: [{ presentacion: '', stock: 0 }]
-  };
-  const [form, setForm] = useState(emptyForm);
+  function nuevoForm() {
+    return {
+      id: 0, nombre: '', descripcion: '', categoria_id: '', departamento: '', marca: '', modelo: '', color: '', material: '', codigo_barras: '',
+      costo_unitario: '', precio_publico: '', iva: esFarmacia ? 0 : 16,
+      principio_activo: '', laboratorio: '', forma_farmaceutica: '', registro_sanitario: '',
+      requiere_receta: false, sustancia_controlada: false, maneja_lotes: esFarmacia,
+      presentaciones: [{ presentacion: '', stock: 0, cantidad: '', fecha_caducidad: '', numero_lote: '' }]
+    };
+  }
+  const [form, setForm] = useState(nuevoForm);
 
   async function load() {
     const [prods, cats, dp] = await Promise.all([
@@ -53,7 +58,7 @@ export default function Inventario() {
   }
   useEffect(() => { load(); }, [dept]);
 
-  function openNew() { setForm({ ...emptyForm, departamento: dept, presentaciones: [{ presentacion: '', stock: 0 }] }); setError(''); setErroresCampo({}); setModalOpen(true); }
+  function openNew() { setForm({ ...nuevoForm(), departamento: dept }); setError(''); setErroresCampo({}); setModalOpen(true); }
   function openEdit(p) {
     setForm({
       id: p.id, nombre: p.nombre, descripcion: p.descripcion || '', categoria_id: p.categoria_id || '', departamento: p.departamento || '',
@@ -68,7 +73,7 @@ export default function Inventario() {
     setModalOpen(true);
   }
 
-  function addPresentacionRow() { setForm({ ...form, presentaciones: [...form.presentaciones, { presentacion: '', stock: 0 }] }); }
+  function addPresentacionRow() { setForm({ ...form, presentaciones: [...form.presentaciones, { presentacion: '', stock: 0, cantidad: '', fecha_caducidad: '', numero_lote: '' }] }); }
   function updatePresentacionRow(i, field, val) {
     const t = [...form.presentaciones]; t[i][field] = val; setForm({ ...form, presentaciones: t });
   }
@@ -160,7 +165,7 @@ export default function Inventario() {
       <div className="card" style={{ padding: 0 }} data-tour="inv-tabla">
         <div className="table-wrap">
           <table>
-            <thead><tr><th>SKU</th><th>Nombre</th><th>Categoría</th><th>Color</th><th>Presentaciones/Stock</th><th>Costo</th><th>Precio</th><th>Utilidad</th><th>Acciones</th></tr></thead>
+            <thead><tr><th>SKU</th><th>Nombre</th><th>Categoría</th><th>{esFarmacia ? 'Caducidad' : 'Color'}</th><th>Presentaciones/Stock</th><th>Costo</th><th>Precio</th><th>Utilidad</th><th>Acciones</th></tr></thead>
             <tbody>
               {productos.length === 0 && <tr><td colSpan="9" style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>Sin productos.</td></tr>}
               {productos.map((p) => {
@@ -179,7 +184,11 @@ export default function Inventario() {
                       </div>
                     </td>
                     <td>{p.cat_nombre ? <span className="badge-pill">{p.cat_nombre}</span> : '—'}</td>
-                    <td>{p.color || '—'}</td>
+                    <td>{esFarmacia
+                      ? (p.proxima_caducidad
+                        ? <span style={{ color: colorCaducidad(p.proxima_caducidad), fontWeight: 600 }}>{p.proxima_caducidad}</span>
+                        : '—')
+                      : (p.color || '—')}</td>
                     <td><button className="btn btn-secondary btn-xs" onClick={() => verPresentaciones(p)}>{p.num_presentaciones} pres. ({p.stock_total} u)</button></td>
                     <td>{money(p.costo_unitario)}</td>
                     <td style={{ fontWeight: 600 }}>{money(p.precio_publico)}</td>
@@ -222,10 +231,10 @@ export default function Inventario() {
             </select>
           </div>
           <div className="form-group"><label>Departamento</label><input value={form.departamento} onChange={(e) => setForm({ ...form, departamento: e.target.value })} placeholder="Ej. Medicamentos, Ropa..." /></div>
-          <div className="form-group"><label>Marca</label><input value={form.marca} onChange={(e) => setForm({ ...form, marca: e.target.value })} /></div>
-          <div className="form-group"><label>Modelo</label><input value={form.modelo} onChange={(e) => setForm({ ...form, modelo: e.target.value })} /></div>
-          <div className="form-group"><label>Color</label><input value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} /></div>
-          <div className="form-group"><label>Material</label><input value={form.material} onChange={(e) => setForm({ ...form, material: e.target.value })} /></div>
+          {!esFarmacia && <div className="form-group"><label>Marca</label><input value={form.marca} onChange={(e) => setForm({ ...form, marca: e.target.value })} /></div>}
+          {!esFarmacia && <div className="form-group"><label>Modelo</label><input value={form.modelo} onChange={(e) => setForm({ ...form, modelo: e.target.value })} /></div>}
+          {!esFarmacia && <div className="form-group"><label>Color</label><input value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} /></div>}
+          {!esFarmacia && <div className="form-group"><label>Material</label><input value={form.material} onChange={(e) => setForm({ ...form, material: e.target.value })} /></div>}
           <div className="form-group"><label>Código de barras</label><input value={form.codigo_barras} onChange={(e) => setForm({ ...form, codigo_barras: e.target.value })} /></div>
           <div className="form-group">
             <label>Costo Unitario ($) *</label>
@@ -256,7 +265,7 @@ export default function Inventario() {
         </div>
 
         <div style={{ marginTop: 6, marginBottom: 16 }} data-tour="inv-datos-regulados">
-          <div className="card-title" style={{ fontSize: 13 }}>Datos regulados (medicamentos y similares — opcional)</div>
+          <div className="card-title" style={{ fontSize: 13 }}>{esFarmacia ? 'Datos del medicamento' : 'Datos regulados (medicamentos y similares — opcional)'}</div>
           <div className="form-grid">
             <div className="form-group"><label>Principio activo</label><input value={form.principio_activo} onChange={(e) => setForm({ ...form, principio_activo: e.target.value })} placeholder="Ej. Paracetamol" /></div>
             <div className="form-group"><label>Laboratorio</label><input value={form.laboratorio} onChange={(e) => setForm({ ...form, laboratorio: e.target.value })} /></div>
@@ -286,17 +295,24 @@ export default function Inventario() {
               <button type="button" className="btn btn-secondary btn-xs" onClick={addPresentacionRow}>+ Agregar</button>
             </div>
             {form.presentaciones.map((t, i) => (
-              <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-                <input placeholder="Ej. 500mg, Caja c/20, Presentacion 26..." value={t.presentacion} onChange={(e) => updatePresentacionRow(i, 'presentacion', e.target.value)} />
+              <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+                <input placeholder="Ej. 500mg, Caja c/20, Presentacion 26..." value={t.presentacion} onChange={(e) => updatePresentacionRow(i, 'presentacion', e.target.value)} style={{ flex: '1 1 160px' }} />
                 {!form.maneja_lotes && (
                   <input type="number" placeholder="Stock" style={{ width: 100 }} value={t.stock} onChange={(e) => updatePresentacionRow(i, 'stock', Number(e.target.value))} />
+                )}
+                {form.maneja_lotes && (
+                  <>
+                    <input type="number" placeholder="Cantidad" style={{ width: 100 }} value={t.cantidad} onChange={(e) => updatePresentacionRow(i, 'cantidad', e.target.value)} />
+                    <input type="date" title="Fecha de caducidad" style={{ width: 150 }} value={t.fecha_caducidad} onChange={(e) => updatePresentacionRow(i, 'fecha_caducidad', e.target.value)} />
+                    <input placeholder="N° de lote (opcional)" style={{ width: 150 }} value={t.numero_lote} onChange={(e) => updatePresentacionRow(i, 'numero_lote', e.target.value)} />
+                  </>
                 )}
                 <button type="button" className="btn btn-danger btn-xs" onClick={() => removePresentacionRow(i)}>✕</button>
               </div>
             ))}
             {form.maneja_lotes && (
               <p style={{ color: 'var(--muted)', fontSize: 11, marginTop: 4 }}>
-                Este producto maneja lotes: el stock siempre entra por lote (con su caducidad), nunca como número suelto. Guarda el producto y usa "Ver lotes" en cada presentación para capturarlo.
+                Este producto maneja lotes: captura cantidad y caducidad de una vez aquí. Si necesitas agregar más lotes después, usa "Ver lotes" en cada presentación.
               </p>
             )}
           </div>

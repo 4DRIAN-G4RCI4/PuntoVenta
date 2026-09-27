@@ -13,12 +13,14 @@ export default function Perfil() {
   const [mostrarPassword, setMostrarPassword] = useState(false);
 
   const [nombreNegocio, setNombreNegocio] = useState(negocio?.nombre_negocio || '');
+  const [tipoNegocio, setTipoNegocio] = useState(negocio?.tipo_negocio || 'general');
   const [logoPreview, setLogoPreview] = useState(negocio?.logo || null);
   const [negocioMsg, setNegocioMsg] = useState('');
   const [guardandoNegocio, setGuardandoNegocio] = useState(false);
 
   useEffect(() => {
     setNombreNegocio(negocio?.nombre_negocio || '');
+    setTipoNegocio(negocio?.tipo_negocio || 'general');
     setLogoPreview(negocio?.logo || null);
   }, [negocio]);
 
@@ -48,7 +50,7 @@ export default function Perfil() {
   async function guardarIdentidad() {
     setGuardandoNegocio(true);
     setNegocioMsg('');
-    const res = await guardarNegocio({ nombre_negocio: nombreNegocio, logo: logoPreview });
+    const res = await guardarNegocio({ nombre_negocio: nombreNegocio, logo: logoPreview, tipo_negocio: tipoNegocio });
     setNegocioMsg(res.ok ? 'Identidad del negocio actualizada.' : (res.error || 'No se pudo guardar.'));
     setGuardandoNegocio(false);
   }
@@ -104,6 +106,17 @@ export default function Perfil() {
               <div className="form-group">
                 <label>Nombre del negocio</label>
                 <input value={nombreNegocio} onChange={(e) => setNombreNegocio(e.target.value)} placeholder="Ej. Poblano" />
+              </div>
+
+              <div className="form-group">
+                <label>Tipo de negocio</label>
+                <select value={tipoNegocio} onChange={(e) => setTipoNegocio(e.target.value)}>
+                  <option value="general">General</option>
+                  <option value="farmacia">Farmacia</option>
+                </select>
+                <div style={{ color: 'var(--muted)', fontSize: 11, marginTop: 4 }}>
+                  Cambia qué campos aparecen al agregar un producto (ej. Farmacia muestra caducidad y datos regulados; oculta marca/talla/color).
+                </div>
               </div>
 
               <div className="form-group">
