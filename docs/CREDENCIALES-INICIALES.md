@@ -41,3 +41,26 @@ actualización (o sea, si `admin123`/`vendedor123`/`almacen123` ya estuvieron
 activas en tu instalación), cámbialas manualmente en cuanto puedas — entra
 como admin y en Usuarios resetea la contraseña de cada una (eso también las
 vuelve a marcar como temporales, forzando el cambio en su siguiente login).
+
+## Si el administrador olvida su contraseña
+
+Cada instalación genera automáticamente una **llave de recuperación** única
+(formato `PVP-XXXX-XXXX-XXXX`) desde el primer arranque. Si el admin se
+queda fuera y no hay otro admin que le resetee la contraseña, en la pantalla
+de login hay un link **"¿Olvidaste tu contraseña? Recuperar acceso"** que
+pide esa llave + el correo del admin, y deja poner una contraseña nueva.
+
+- La llave se puede consultar en cualquier momento (y regenerar) desde
+  **Perfil → Llave de Recuperación de Acceso** (pide la contraseña actual
+  del admin como confirmación — solo se muestra en pantalla en ese momento,
+  nunca se guarda en texto plano ni se puede volver a ver sin regenerarla).
+- **Quien instala el sistema (tú) debe guardar una copia de la llave de cada
+  cliente en su propio registro** (una hoja de cálculo, notas, lo que uses
+  para llevar el control de tus instalaciones) — así, si el cliente pierde
+  su copia, tú puedes dársela de nuevo sin tener que entrar remotamente al
+  archivo de la base de datos.
+- Al usarse una vez, la llave se invalida automáticamente y se genera una
+  nueva — hay que volver a guardarla después de cada uso.
+- **No existe una "llave maestra" que funcione en todas las instalaciones.**
+  Cada negocio tiene la suya, para que si una se filtra, solo afecte a ese
+  cliente y no a todos los que uses el sistema.

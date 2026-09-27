@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('api', {
     logout: invoke('auth:logout'),
     changePassword: invoke('auth:changePassword'),
     cambiarPasswordObligatorio: invoke('auth:cambiarPasswordObligatorio'),
+    recuperarAcceso: invoke('auth:recuperarAcceso'),
     updateProfile: invoke('auth:updateProfile')
   },
   usuarios: {
@@ -115,6 +116,8 @@ contextBridge.exposeInMainWorld('api', {
     exportDb: invoke('config:exportDb'),
     importDb: invoke('config:importDb'),
     eliminarBaseDatos: invoke('config:eliminarBaseDatos'),
+    regenerarLlaveRecuperacion: invoke('config:regenerarLlaveRecuperacion'),
+    tieneLlaveRecuperacion: invoke('config:tieneLlaveRecuperacion'),
     getNegocio: invoke('config:getNegocio'),
     getSupabaseConfig: invoke('config:getSupabaseConfig'),
     setSupabaseConfig: invoke('config:setSupabaseConfig'),

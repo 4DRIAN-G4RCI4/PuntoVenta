@@ -12,6 +12,24 @@ export default function Perfil() {
   const [pwMsg, setPwMsg] = useState('');
   const [mostrarPassword, setMostrarPassword] = useState(false);
 
+  const [llavePassword, setLlavePassword] = useState('');
+  const [llaveMostrarPassword, setLlaveMostrarPassword] = useState(false);
+  const [llaveGenerada, setLlaveGenerada] = useState('');
+  const [llaveMsg, setLlaveMsg] = useState('');
+  const [llaveCargando, setLlaveCargando] = useState(false);
+
+  async function regenerarLlave() {
+    if (!llavePassword) { setLlaveMsg('Ingresa tu contraseña para confirmar.'); return; }
+    if (llaveGenerada && !confirm('Esto invalida la llave de recuperación anterior — si la guardaste en algún lado, ya no servirá. ¿Continuar?')) return;
+    setLlaveCargando(true);
+    setLlaveMsg('');
+    const res = await window.api.config.regenerarLlaveRecuperacion({ password: llavePassword });
+    setLlaveCargando(false);
+    if (!res.ok) { setLlaveMsg(res.error || 'No se pudo generar la llave.'); return; }
+    setLlaveGenerada(res.llave);
+    setLlavePassword('');
+  }
+
   const [nombreNegocio, setNombreNegocio] = useState(negocio?.nombre_negocio || '');
   const [tipoNegocio, setTipoNegocio] = useState(negocio?.tipo_negocio || 'general');
   const [logoPreview, setLogoPreview] = useState(negocio?.logo || null);
@@ -90,6 +108,41 @@ export default function Perfil() {
               <p style={{ color: 'var(--muted)', fontSize: 12, margin: 0 }}>
                 Por seguridad, solo el administrador puede cambiar contraseñas. Si necesitas actualizar la tuya, pídele a tu administrador que lo haga desde la sección Usuarios.
               </p>
+            </div>
+          )}
+          {user.rol === 'admin' && (
+            <div className="card" data-tour="perfil-llave-recuperacion">
+              <div className="card-title">Llave de Recuperación de Acceso</div>
+              <p style={{ color: 'var(--muted)', fontSize: 12, marginTop: -6, marginBottom: 14 }}>
+                Si el administrador olvida su contraseña y no hay otro admin que se la resetee, esta llave permite
+                recuperar el acceso desde la pantalla de inicio de sesión ("¿Olvidaste tu contraseña?"). Guárdala en
+                un lugar seguro fuera de la computadora — nadie más la va a mostrar por ti.
+              </p>
+              {llaveMsg && <div className="alert alert-error">{llaveMsg}</div>}
+              {llaveGenerada ? (
+                <div className="alert alert-success" style={{ marginBottom: 14 }}>
+                  <strong>Guarda esta llave ahora — no se vuelve a mostrar:</strong>
+                  <div style={{ display: 'block', marginTop: 8, fontSize: 15, fontFamily: 'monospace', letterSpacing: 1, textAlign: 'center', userSelect: 'all' }}>
+                    {llaveGenerada}
+                  </div>
+                </div>
+              ) : (
+                <div className="form-group">
+                  <label>Tu contraseña (para confirmar)</label>
+                  <input
+                    type={llaveMostrarPassword ? 'text' : 'password'}
+                    value={llavePassword}
+                    onChange={(e) => setLlavePassword(e.target.value)}
+                  />
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, textTransform: 'none', fontSize: 11, fontWeight: 400, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={llaveMostrarPassword} onChange={() => setLlaveMostrarPassword((v) => !v)} style={{ width: 'auto' }} />
+                    Mostrar contraseña
+                  </label>
+                </div>
+              )}
+              <button className="btn btn-primary" onClick={regenerarLlave} disabled={llaveCargando}>
+                {llaveCargando ? 'Generando...' : (llaveGenerada ? 'Listo' : 'Ver / generar llave de recuperación')}
+              </button>
             </div>
           )}
         </div>
