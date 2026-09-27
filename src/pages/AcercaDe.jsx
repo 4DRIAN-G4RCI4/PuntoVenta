@@ -1,6 +1,11 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 
 export default function AcercaDe() {
+  const [version, setVersion] = useState('');
+  useEffect(() => {
+    window.api.config.getVersion().then((r) => { if (r.ok) setVersion(r.version); });
+  }, []);
+
   return (
     <div style={{ maxWidth: 640 }}>
       <h2 style={{ marginBottom: 16 }}>Acerca de</h2>
@@ -12,7 +17,7 @@ export default function AcercaDe() {
           gastos y reportes — con una app móvil de solo lectura para consultar tu negocio
           desde cualquier lugar.
         </p>
-        <div style={{ marginTop: 12, fontSize: 12, color: 'var(--muted)' }}>Versión 1.0.0</div>
+        <div style={{ marginTop: 12, fontSize: 12, color: 'var(--muted)' }}>Versión {version || '...'}</div>
       </div>
 
       <div className="card" data-tour="acerca-puntotec">
