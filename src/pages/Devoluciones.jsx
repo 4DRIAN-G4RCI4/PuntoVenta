@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import Modal from '../components/Modal.jsx';
 import { money, dateFmt } from '../format.js';
 import { useAuth } from '../App.jsx';
+import { useFormConfirm } from '../hooks/useFormConfirm.js';
 
 export default function Devoluciones() {
   const { user } = useAuth();
@@ -20,6 +21,13 @@ export default function Devoluciones() {
   useEffect(() => { load(); }, [mes]);
 
   function openNew() { setFolio(''); setVenta(null); setSeleccion({}); setMotivo(''); setNotas(''); setError(''); setModalOpen(true); }
+  const cerrarModal = useFormConfirm({
+    esArticuloNuevo: true,
+    // Lo que de verdad se perdería al cerrar sin querer: haber encontrado la
+    // venta (hay que rebuscar el folio) o haber escrito el motivo ya.
+    tieneDatos: () => !!venta || motivo.trim() !== '' || Object.values(seleccion).some((q) => q > 0),
+    onClose: () => setModalOpen(false)
+  });
 
   async function buscarVenta() {
     setError('');
@@ -86,9 +94,9 @@ export default function Devoluciones() {
         </div>
       </div>
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} maxWidth={620} title="Registrar Devolución"
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} confirmarCierre={cerrarModal} maxWidth={620} title="Registrar Devolución"
         footer={<>
-          <button className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancelar</button>
+          <button className="btn btn-secondary" onClick={cerrarModal}>Cancelar</button>
           {venta && <button className="btn btn-primary" onClick={registrar}>Registrar Devolución</button>}
         </>}>
         {error && <div className="alert alert-error">{error}</div>}

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import Modal from '../components/Modal.jsx';
 import { money } from '../format.js';
 import { useAuth } from '../App.jsx';
+import { useFormConfirm } from '../hooks/useFormConfirm.js';
 
 const CATEGORIAS = { general: 'General', renta: 'Renta', servicios: 'Servicios', nomina: 'Nómina', proveedores: 'Proveedores', transporte: 'Transporte', mantenimiento: 'Mantenimiento', marketing: 'Marketing', otros: 'Otros' };
 const emptyForm = { id: 0, concepto: '', monto: '', categoria: 'general', forma_pago: 'efectivo', fecha: new Date().toISOString().slice(0, 10), proveedor: '', notas: '' };
@@ -24,13 +25,19 @@ export default function Gastos() {
 
   const totalMes = gastos.reduce((s, g) => s + g.monto, 0);
 
-  function openNew() { setForm(emptyForm); setError(''); setModalOpen(true); }
+  const gastoTieneDatos = () => form.concepto.trim() !== '' || String(form.monto).trim() !== '' || form.proveedor.trim() !== '' || form.notas.trim() !== '';
+  function openNew() {
+    if (!form.id && gastoTieneDatos()) { setModalOpen(true); return; }
+    setForm(emptyForm); setError(''); setModalOpen(true);
+  }
   function openEdit(g) { setForm({ ...g, monto: g.monto }); setError(''); setModalOpen(true); }
+  const cerrarModal = useFormConfirm({ esArticuloNuevo: !form.id, tieneDatos: gastoTieneDatos, onClose: () => setModalOpen(false) });
 
   async function save() {
     if (!form.concepto.trim() || !(Number(form.monto) > 0)) { setError('Concepto y monto son requeridos.'); return; }
     const res = await window.api.gastos.save({ ...form, monto: Number(form.monto), usuario_id: user.id });
     if (!res.ok) { setError(res.error); return; }
+    setForm(emptyForm);
     setModalOpen(false);
     load();
   }
@@ -97,8 +104,8 @@ export default function Gastos() {
         </div>
       </div>
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={form.id ? 'Editar Gasto' : 'Nuevo Gasto'}
-        footer={<><button className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancelar</button><button className="btn btn-primary" onClick={save}>Guardar</button></>}>
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} confirmarCierre={cerrarModal} title={form.id ? 'Editar Gasto' : 'Nuevo Gasto'}
+        footer={<><button className="btn btn-secondary" onClick={cerrarModal}>Cancelar</button><button className="btn btn-primary" onClick={save}>Guardar</button></>}>
         {error && <div className="alert alert-error">{error}</div>}
         <div className="form-grid">
           <div className="form-group span-full"><label>Concepto *</label><input value={form.concepto} onChange={(e) => setForm({ ...form, concepto: e.target.value })} /></div>

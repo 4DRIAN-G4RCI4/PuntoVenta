@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import Modal from '../components/Modal.jsx';
 import { useAuth } from '../App.jsx';
+import { useFormConfirm } from '../hooks/useFormConfirm.js';
 
 const emptyForm = { id: 0, nombre: '', email: '', rol: 'vendedor', activo: 1, password: '' };
 
@@ -15,13 +16,22 @@ export default function Usuarios() {
   async function load() { setRows(await window.api.usuarios.list()); }
   useEffect(() => { load(); }, []);
 
-  function openNew() { setForm(emptyForm); setError(''); setMostrarPassword(false); setModalOpen(true); }
+  function openNew() {
+    if (!form.id && (form.nombre.trim() || form.email.trim() || form.password.trim())) { setModalOpen(true); return; }
+    setForm(emptyForm); setError(''); setMostrarPassword(false); setModalOpen(true);
+  }
   function openEdit(u) { setForm({ ...u, password: '' }); setError(''); setMostrarPassword(false); setModalOpen(true); }
+  const cerrarModal = useFormConfirm({
+    esArticuloNuevo: !form.id,
+    tieneDatos: () => form.nombre.trim() !== '' || form.email.trim() !== '' || form.password.trim() !== '',
+    onClose: () => setModalOpen(false)
+  });
 
   async function save() {
     if (!form.nombre.trim() || !form.email.trim()) { setError('Nombre y correo son requeridos.'); return; }
     const res = await window.api.usuarios.save(form);
     if (!res.ok) { setError(res.error); return; }
+    setForm(emptyForm);
     setModalOpen(false);
     load();
   }
@@ -56,8 +66,8 @@ export default function Usuarios() {
         ))}
       </div>
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={form.id ? 'Editar Usuario' : 'Nuevo Usuario'}
-        footer={<><button className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancelar</button><button className="btn btn-primary" onClick={save}>Guardar</button></>}>
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} confirmarCierre={cerrarModal} title={form.id ? 'Editar Usuario' : 'Nuevo Usuario'}
+        footer={<><button className="btn btn-secondary" onClick={cerrarModal}>Cancelar</button><button className="btn btn-primary" onClick={save}>Guardar</button></>}>
         {error && <div className="alert alert-error">{error}</div>}
         <div className="form-group"><label>Nombre Completo *</label><input value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} /></div>
         <div className="form-group"><label>Correo Electrónico *</label><input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>

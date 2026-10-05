@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import Modal from '../components/Modal.jsx';
 import { money, dateFmt } from '../format.js';
+import { useFormConfirm } from '../hooks/useFormConfirm.js';
 
 export default function Credito() {
   const [q, setQ] = useState('');
@@ -20,6 +21,11 @@ export default function Credito() {
   useEffect(() => { load(); }, []);
 
   function abrirAbono(v) { setAbonoModal(v); setMonto(''); setReferencia(''); }
+  const cerrarAbono = useFormConfirm({
+    esArticuloNuevo: true,
+    tieneDatos: () => monto.trim() !== '' || referencia.trim() !== '',
+    onClose: () => setAbonoModal(null)
+  });
 
   async function confirmarAbono() {
     const m = Number(monto);
@@ -88,9 +94,9 @@ export default function Credito() {
         </div>
       )}
 
-      <Modal open={!!abonoModal} onClose={() => setAbonoModal(null)} title="Registrar Abono"
+      <Modal open={!!abonoModal} onClose={() => setAbonoModal(null)} confirmarCierre={cerrarAbono} title="Registrar Abono"
         footer={<>
-          <button className="btn btn-secondary" onClick={() => setAbonoModal(null)}>Cancelar</button>
+          <button className="btn btn-secondary" onClick={cerrarAbono}>Cancelar</button>
           <button className="btn btn-success" onClick={confirmarAbono}>Registrar Abono</button>
         </>}>
         {abonoModal && <>

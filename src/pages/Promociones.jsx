@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import Modal from '../components/Modal.jsx';
 import { useAuth } from '../App.jsx';
 import { money } from '../format.js';
+import { useFormConfirm } from '../hooks/useFormConfirm.js';
 
 const emptyForm = { id: 0, nombre: '', codigo: '', tipo: 'porcentaje', valor: '', departamento: 'todos', categoria_id: '', producto_id: '', fecha_inicio: '', fecha_fin: '', activo: 1 };
 
@@ -16,13 +17,19 @@ export default function Promociones() {
   async function load() { setRows(await window.api.promociones.list()); }
   useEffect(() => { load(); }, []);
 
-  function openNew() { setForm(emptyForm); setError(''); setModalOpen(true); }
+  const promoTieneDatos = () => form.nombre.trim() !== '' || form.codigo.trim() !== '' || String(form.valor).trim() !== '';
+  function openNew() {
+    if (!form.id && promoTieneDatos()) { setModalOpen(true); return; }
+    setForm(emptyForm); setError(''); setModalOpen(true);
+  }
   function openEdit(p) { setForm({ ...emptyForm, ...p }); setError(''); setModalOpen(true); }
+  const cerrarModal = useFormConfirm({ esArticuloNuevo: !form.id, tieneDatos: promoTieneDatos, onClose: () => setModalOpen(false) });
 
   async function save() {
     if (!form.nombre.trim() || !form.valor) { setError('Nombre y valor son requeridos.'); return; }
     const res = await window.api.promociones.save({ ...form, valor: Number(form.valor), categoria_id: form.categoria_id || null, producto_id: form.producto_id || null });
     if (!res.ok) { setError(res.error); return; }
+    setForm(emptyForm);
     setModalOpen(false);
     load();
   }
@@ -71,8 +78,8 @@ export default function Promociones() {
         </div>
       </div>
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} maxWidth={640} title={form.id ? 'Editar Promoción' : 'Nueva Promoción'}
-        footer={<><button className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancelar</button><button className="btn btn-primary" onClick={save}>Guardar</button></>}>
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} confirmarCierre={cerrarModal} maxWidth={640} title={form.id ? 'Editar Promoción' : 'Nueva Promoción'}
+        footer={<><button className="btn btn-secondary" onClick={cerrarModal}>Cancelar</button><button className="btn btn-primary" onClick={save}>Guardar</button></>}>
         {error && <div className="alert alert-error">{error}</div>}
         <div className="form-grid">
           <div className="form-group span-full"><label>Nombre *</label><input value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} /></div>

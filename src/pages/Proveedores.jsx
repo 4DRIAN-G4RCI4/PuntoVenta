@@ -1,22 +1,34 @@
 import React, { useEffect, useState } from 'react';
 import Modal from '../components/Modal.jsx';
+import { useFormConfirm } from '../hooks/useFormConfirm.js';
+
+const emptyForm = { id: 0, nombre: '', contacto: '', telefono: '', email: '', notas: '' };
 
 export default function Proveedores() {
   const [data, setData] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
-  const [form, setForm] = useState({ id: 0, nombre: '', contacto: '', telefono: '', email: '', notas: '' });
+  const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState('');
 
   async function load() { setData(await window.api.proveedores.list()); }
   useEffect(() => { load(); }, []);
 
-  function openNew() { setForm({ id: 0, nombre: '', contacto: '', telefono: '', email: '', notas: '' }); setError(''); setModalOpen(true); }
+  function openNew() {
+    if (!form.id && Object.keys(emptyForm).some((k) => k !== 'id' && form[k].trim() !== '')) { setModalOpen(true); return; }
+    setForm(emptyForm); setError(''); setModalOpen(true);
+  }
   function openEdit(p) { setForm({ id: p.id, nombre: p.nombre, contacto: p.contacto || '', telefono: p.telefono || '', email: p.email || '', notas: p.notas || '' }); setError(''); setModalOpen(true); }
+  const cerrarModal = useFormConfirm({
+    esArticuloNuevo: !form.id,
+    tieneDatos: () => Object.keys(emptyForm).some((k) => k !== 'id' && form[k].trim() !== ''),
+    onClose: () => setModalOpen(false)
+  });
 
   async function save() {
     if (!form.nombre.trim()) { setError('El nombre es requerido.'); return; }
     const res = await window.api.proveedores.save(form);
     if (!res.ok) { setError(res.error); return; }
+    setForm(emptyForm);
     setModalOpen(false);
     load();
   }
@@ -63,9 +75,9 @@ export default function Proveedores() {
         </div>
       </div>
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={form.id ? 'Editar Proveedor' : 'Nuevo Proveedor'}
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} confirmarCierre={cerrarModal} title={form.id ? 'Editar Proveedor' : 'Nuevo Proveedor'}
         footer={<>
-          <button className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancelar</button>
+          <button className="btn btn-secondary" onClick={cerrarModal}>Cancelar</button>
           <button className="btn btn-primary" onClick={save}>Guardar</button>
         </>}>
         {error && <div className="alert alert-error">{error}</div>}

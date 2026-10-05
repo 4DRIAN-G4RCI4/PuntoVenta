@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import Modal from '../components/Modal.jsx';
+import { useFormConfirm } from '../hooks/useFormConfirm.js';
 
 export default function Categorias() {
   const [data, setData] = useState({ principales: [], subcategorias: [], cats_select: [] });
@@ -10,13 +11,22 @@ export default function Categorias() {
   async function load() { setData(await window.api.categorias.listAll()); }
   useEffect(() => { load(); }, []);
 
-  function openNew() { setForm({ id: 0, nombre: '', parent_id: '', descripcion: '' }); setError(''); setModalOpen(true); }
+  function openNew() {
+    if (!form.id && (form.nombre.trim() || form.descripcion.trim())) { setModalOpen(true); return; }
+    setForm({ id: 0, nombre: '', parent_id: '', descripcion: '' }); setError(''); setModalOpen(true);
+  }
   function openEdit(c) { setForm({ id: c.id, nombre: c.nombre, parent_id: c.parent_id || '', descripcion: c.descripcion || '' }); setError(''); setModalOpen(true); }
+  const cerrarModal = useFormConfirm({
+    esArticuloNuevo: !form.id,
+    tieneDatos: () => form.nombre.trim() !== '' || form.descripcion.trim() !== '',
+    onClose: () => setModalOpen(false)
+  });
 
   async function save() {
     if (!form.nombre.trim()) { setError('El nombre es requerido.'); return; }
     const res = await window.api.categorias.save({ ...form, parent_id: form.parent_id ? Number(form.parent_id) : null });
     if (!res.ok) { setError(res.error); return; }
+    setForm({ id: 0, nombre: '', parent_id: '', descripcion: '' });
     setModalOpen(false);
     load();
   }
@@ -86,9 +96,9 @@ export default function Categorias() {
         {renderTable(data.subcategorias, true)}
       </div>
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={form.id ? 'Editar Categoría' : 'Nueva Categoría'}
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} confirmarCierre={cerrarModal} title={form.id ? 'Editar Categoría' : 'Nueva Categoría'}
         footer={<>
-          <button className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancelar</button>
+          <button className="btn btn-secondary" onClick={cerrarModal}>Cancelar</button>
           <button className="btn btn-primary" onClick={save}>Guardar</button>
         </>}>
         {error && <div className="alert alert-error">{error}</div>}
