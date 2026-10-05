@@ -58,7 +58,29 @@ export default function Inventario() {
   }
   useEffect(() => { load(); }, [dept]);
 
-  function openNew() { setForm({ ...nuevoForm(), departamento: dept }); setError(''); setErroresCampo({}); setModalOpen(true); }
+  // Si ya había algo capturado en "Nuevo Producto" (un clic afuera lo cerró sin
+  // querer, por ejemplo), reabrir deja justo donde se quedó en vez de empezar de
+  // cero — solo se limpia tras guardar con éxito o si el usuario confirma cancelar.
+  function openNew() {
+    if (!form.id && formTieneDatos()) { setModalOpen(true); return; }
+    setForm({ ...nuevoForm(), departamento: dept }); setError(''); setErroresCampo({}); setModalOpen(true);
+  }
+  function formTieneDatos() {
+    const vacio = nuevoForm();
+    return form.nombre.trim() !== '' || form.descripcion.trim() !== '' || form.costo_unitario !== '' || form.precio_publico !== ''
+      || form.codigo_barras.trim() !== '' || form.marca.trim() !== '' || form.modelo.trim() !== '' || form.color.trim() !== '' || form.material.trim() !== ''
+      || form.principio_activo.trim() !== '' || form.laboratorio.trim() !== '' || form.forma_farmaceutica.trim() !== '' || form.registro_sanitario.trim() !== ''
+      || form.presentaciones.some((t) => t.presentacion.trim() !== '' || t.cantidad !== '' || t.fecha_caducidad !== '');
+  }
+  function cerrarModal() {
+    // Solo pregunta al cancelar un alta nueva a medio llenar — editar un producto
+    // existente siempre se puede cerrar sin perder nada (los datos siguen en la BD).
+    if (!form.id && formTieneDatos() && !confirm('¿Cancelar? Se perderá lo que llevas capturado de este producto.')) {
+      return false;
+    }
+    setModalOpen(false);
+    return true;
+  }
   function openEdit(p) {
     setForm({
       id: p.id, nombre: p.nombre, descripcion: p.descripcion || '', categoria_id: p.categoria_id || '', departamento: p.departamento || '',
@@ -94,6 +116,7 @@ export default function Inventario() {
     const payload = { ...form, departamento: form.departamento || dept, categoria_id: form.categoria_id ? Number(form.categoria_id) : null, costo_unitario: Number(form.costo_unitario), precio_publico: Number(form.precio_publico) };
     const res = await window.api.productos.save(payload);
     if (!res.ok) { setError(res.error); return; }
+    setForm(nuevoForm());
     setModalOpen(false);
     load();
   }
@@ -207,9 +230,9 @@ export default function Inventario() {
         </div>
       </div>
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} maxWidth={720} title={form.id ? 'Editar Producto' : 'Nuevo Producto'}
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} confirmarCierre={cerrarModal} maxWidth={720} title={form.id ? 'Editar Producto' : 'Nuevo Producto'}
         footer={<>
-          <button className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancelar</button>
+          <button className="btn btn-secondary" onClick={cerrarModal}>Cancelar</button>
           <button className="btn btn-primary" onClick={save}>Guardar</button>
         </>}>
         {!!error && <div className="alert alert-error">{error}</div>}
