@@ -3,11 +3,17 @@ import React, { useEffect, useState } from 'react';
 export default function InventarioFisico() {
   const [rows, setRows] = useState([]);
   const [ajustes, setAjustes] = useState({});
+  const [q, setQ] = useState('');
 
   async function load() { setRows(await window.api.inventarioFisico.list()); }
   useEffect(() => { load(); }, []);
 
   function setFisico(id, val) { setAjustes({ ...ajustes, [id]: val }); }
+
+  const qNorm = q.trim().toLowerCase();
+  const rowsFiltradas = qNorm
+    ? rows.filter((r) => r.nombre.toLowerCase().includes(qNorm) || r.sku.toLowerCase().includes(qNorm) || r.presentacion.toLowerCase().includes(qNorm))
+    : rows;
 
   async function guardar(id) {
     const val = ajustes[id];
@@ -20,12 +26,18 @@ export default function InventarioFisico() {
   return (
     <div>
       <h2 style={{ marginBottom: 16 }}>Conteo Físico de Inventario</h2>
+      <div className="toolbar">
+        <div className="search-bar">
+          <input placeholder="Buscar por nombre, SKU o presentación..." value={q} onChange={(e) => setQ(e.target.value)} />
+        </div>
+        <span style={{ color: 'var(--muted)', fontSize: 12 }}>{rowsFiltradas.length} de {rows.length} presentación(es)</span>
+      </div>
       <div className="card" style={{ padding: 0 }} data-tour="invfis-tabla">
         <div className="table-wrap">
           <table>
             <thead><tr><th>Producto</th><th>SKU</th><th>Presentacion</th><th>Stock Sistema</th><th>Stock Físico (contado)</th><th>Diferencia</th><th></th></tr></thead>
             <tbody>
-              {rows.map((r) => {
+              {rowsFiltradas.map((r) => {
                 const val = ajustes[r.presentacion_id];
                 const diff = val !== undefined && val !== '' ? Number(val) - r.stock_sistema : null;
                 return (
@@ -41,6 +53,7 @@ export default function InventarioFisico() {
                 );
               })}
               {rows.length === 0 && <tr><td colSpan="7" style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>Sin presentaciones registradas.</td></tr>}
+              {rows.length > 0 && rowsFiltradas.length === 0 && <tr><td colSpan="7" style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>Ningún producto coincide con "{q}".</td></tr>}
             </tbody>
           </table>
         </div>
