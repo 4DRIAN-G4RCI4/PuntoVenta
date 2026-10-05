@@ -1269,7 +1269,12 @@ function register(mainWindow, actualizaciones = {}) {
 
   ipcMain.handle('updates:instalarYReiniciar', proteger(ROLES.ANY, () => {
     if (!autoUpdater) return err('No disponible.');
-    autoUpdater.quitAndInstall();
+    // isSilent=true: corre el instalador con /S (sin ventanas, igual que un
+    // reinicio normal) — sin esto, electron-updater muestra el asistente
+    // completo de NSIS (carpeta, Siguiente...) cada vez que se actualiza.
+    // isForceRunAfter=true: reabre la app sola al terminar, no deja al
+    // usuario con la ventana cerrada preguntándose si ya actualizó.
+    autoUpdater.quitAndInstall(true, true);
     return ok();
   }));
 
