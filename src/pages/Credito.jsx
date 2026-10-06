@@ -2,8 +2,10 @@ import React, { useEffect, useState } from 'react';
 import Modal from '../components/Modal.jsx';
 import { money, dateFmt } from '../format.js';
 import { useFormConfirm } from '../hooks/useFormConfirm.js';
+import { useConfirm } from '../components/ConfirmProvider.jsx';
 
 export default function Credito() {
+  const { avisar } = useConfirm();
   const [q, setQ] = useState('');
   const [rows, setRows] = useState([]);
   const [resumen, setResumen] = useState({});
@@ -29,10 +31,10 @@ export default function Credito() {
 
   async function confirmarAbono() {
     const m = Number(monto);
-    if (!m || m <= 0) { alert('Ingresa un monto válido.'); return; }
-    if (m > abonoModal.saldo_pendiente + 0.01) { alert('El abono supera el saldo pendiente.'); return; }
+    if (!m || m <= 0) { await avisar('Ingresa un monto válido.'); return; }
+    if (m > abonoModal.saldo_pendiente + 0.01) { await avisar('El abono supera el saldo pendiente.'); return; }
     const res = await window.api.credito.abonar({ venta_id: abonoModal.id, cliente_id: abonoModal.cliente_id, monto: m, forma_pago: formaPago, referencia });
-    if (!res.ok) { alert(res.error); return; }
+    if (!res.ok) { await avisar(res.error); return; }
     setAbonoModal(null);
     load();
   }

@@ -2,10 +2,12 @@ import React, { useEffect, useState } from 'react';
 import Modal from '../components/Modal.jsx';
 import { money } from '../format.js';
 import { useFormConfirm } from '../hooks/useFormConfirm.js';
+import { useConfirm } from '../components/ConfirmProvider.jsx';
 
 const emptyForm = { id: 0, nombre: '', apellido: '', telefono: '', email: '', calle: '', colonia: '', ciudad: '', estado: '', cp: '', rfc: '', limite_credito: 0, notas: '' };
 
 export default function Clientes() {
+  const { confirmar } = useConfirm();
   const [q, setQ] = useState('');
   const [filtro, setFiltro] = useState('');
   const [rows, setRows] = useState([]);
@@ -37,7 +39,7 @@ export default function Clientes() {
     setModalOpen(false);
     load();
   }
-  async function del(id) { if (!confirm('¿Eliminar este cliente?')) return; await window.api.clientes.delete({ id }); load(); }
+  async function del(id) { if (!(await confirmar('¿Eliminar este cliente?'))) return; await window.api.clientes.delete({ id }); load(); }
   async function verHistorial(c) { setHistModal(c); setHistRows(await window.api.clientes.historial({ id: c.id })); }
 
   return (

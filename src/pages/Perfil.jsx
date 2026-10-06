@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../App.jsx';
 import { resizeImageToDataURL } from '../utils/image.js';
+import { useConfirm } from '../components/ConfirmProvider.jsx';
 
 export default function Perfil() {
   const { user, negocio, guardarNegocio } = useAuth();
+  const { confirmar } = useConfirm();
   const [nombre, setNombre] = useState(user.nombre);
   const [email, setEmail] = useState(user.email);
   const [msg, setMsg] = useState('');
@@ -20,7 +22,7 @@ export default function Perfil() {
 
   async function regenerarLlave() {
     if (!llavePassword) { setLlaveMsg('Ingresa tu contraseña para confirmar.'); return; }
-    if (llaveGenerada && !confirm('Esto invalida la llave de recuperación anterior — si la guardaste en algún lado, ya no servirá. ¿Continuar?')) return;
+    if (llaveGenerada && !(await confirmar('Esto invalida la llave de recuperación anterior — si la guardaste en algún lado, ya no servirá.', '¿Continuar?'))) return;
     setLlaveCargando(true);
     setLlaveMsg('');
     const res = await window.api.config.regenerarLlaveRecuperacion({ password: llavePassword });

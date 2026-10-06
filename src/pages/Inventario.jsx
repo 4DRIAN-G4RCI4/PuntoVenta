@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import Modal from '../components/Modal.jsx';
 import { money } from '../format.js';
 import { useAuth } from '../App.jsx';
+import { useConfirm } from '../components/ConfirmProvider.jsx';
 
 function diasParaCaducar(fechaIso) {
   if (!fechaIso) return null;
@@ -20,6 +21,7 @@ function colorCaducidad(fechaIso) {
 
 export default function Inventario() {
   const { negocio } = useAuth();
+  const { confirmar, avisar } = useConfirm();
   const esFarmacia = negocio?.tipo_negocio === 'farmacia';
   const [dept, setDept] = useState('');
   const [depts, setDepts] = useState([]);
@@ -72,10 +74,10 @@ export default function Inventario() {
       || form.principio_activo.trim() !== '' || form.laboratorio.trim() !== '' || form.forma_farmaceutica.trim() !== '' || form.registro_sanitario.trim() !== ''
       || form.presentaciones.some((t) => t.presentacion.trim() !== '' || t.cantidad !== '' || t.fecha_caducidad !== '');
   }
-  function cerrarModal() {
+  async function cerrarModal() {
     // Solo pregunta al cancelar un alta nueva a medio llenar — editar un producto
     // existente siempre se puede cerrar sin perder nada (los datos siguen en la BD).
-    if (!form.id && formTieneDatos() && !confirm('¿Cancelar? Se perderá lo que llevas capturado de este producto.')) {
+    if (!form.id && formTieneDatos() && !(await confirmar('Se perderá lo que llevas capturado de este producto.', 'Cancelar'))) {
       return false;
     }
     setModalOpen(false);
@@ -122,7 +124,7 @@ export default function Inventario() {
   }
 
   async function del(p) {
-    if (!confirm(`¿Eliminar "${p.nombre}"?`)) return;
+    if (!(await confirmar(`¿Eliminar "${p.nombre}"?`))) return;
     await window.api.productos.delete({ id: p.id });
     load();
   }
@@ -153,14 +155,14 @@ export default function Inventario() {
     const res = await window.api.lotes.add({
       presentacion_id: lotesModal.id, numero_lote: newLote.numero_lote, fecha_caducidad: newLote.fecha_caducidad || null, cantidad: Number(newLote.cantidad)
     });
-    if (!res.ok) { alert(res.error); return; }
+    if (!res.ok) { await avisar(res.error); return; }
     setNewLote({ numero_lote: '', fecha_caducidad: '', cantidad: '' });
     setLotes(await window.api.lotes.list({ presentacion_id: lotesModal.id }));
     setPresentaciones(await window.api.productos.presentaciones({ producto_id: presentacionesModal.id }));
     load();
   }
   async function delLote(id) {
-    if (!confirm('¿Dar de baja este lote? (ej. se caducó o se dañó — descuenta su stock)')) return;
+    if (!(await confirmar('¿Dar de baja este lote? (ej. se caducó o se dañó — descuenta su stock)'))) return;
     await window.api.lotes.delete({ id });
     setLotes(await window.api.lotes.list({ presentacion_id: lotesModal.id }));
     setPresentaciones(await window.api.productos.presentaciones({ producto_id: presentacionesModal.id }));

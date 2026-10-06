@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import Modal from '../components/Modal.jsx';
 import { useFormConfirm } from '../hooks/useFormConfirm.js';
+import { useConfirm } from '../components/ConfirmProvider.jsx';
 
 export default function Categorias() {
+  const { confirmar, avisar } = useConfirm();
   const [data, setData] = useState({ principales: [], subcategorias: [], cats_select: [] });
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState({ id: 0, nombre: '', parent_id: '', descripcion: '' });
@@ -33,9 +35,9 @@ export default function Categorias() {
 
   async function toggle(id) { await window.api.categorias.toggle({ id }); load(); }
   async function del(id) {
-    if (!confirm('¿Eliminar esta categoría?')) return;
+    if (!(await confirmar('¿Eliminar esta categoría?'))) return;
     const res = await window.api.categorias.delete({ id });
-    if (!res.ok) alert(res.error);
+    if (!res.ok) await avisar(res.error);
     load();
   }
 

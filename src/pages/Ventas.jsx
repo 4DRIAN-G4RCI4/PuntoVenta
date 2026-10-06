@@ -3,9 +3,11 @@ import { money } from '../format.js';
 import { useAuth } from '../App.jsx';
 import { TicketContenido } from './Ticket.jsx';
 import { useImprimirTicket } from '../utils/useImprimirTicket.js';
+import { useConfirm } from '../components/ConfirmProvider.jsx';
 
 export default function Ventas() {
   const { user, negocio } = useAuth();
+  const { avisar } = useConfirm();
   const [q, setQ] = useState('');
   const [resultados, setResultados] = useState([]);
   const [scanMsg, setScanMsg] = useState('');
@@ -61,7 +63,7 @@ export default function Ventas() {
     setCarrito((prev) => {
       const idx = prev.findIndex((i) => i.key === key);
       if (idx >= 0) {
-        if (prev[idx].qty >= stockDisp) { alert('Sin más stock.'); return prev; }
+        if (prev[idx].qty >= stockDisp) { avisar('Sin más stock.'); return prev; }
         const copy = [...prev]; copy[idx] = { ...copy[idx], qty: copy[idx].qty + 1 }; return copy;
       }
       return [...prev, {
@@ -142,9 +144,9 @@ export default function Ventas() {
   const cuota = r > 0 ? (financiado * r) / (1 - Math.pow(1 + r, -numMeses)) : financiado / numMeses;
 
   async function crearCliente() {
-    if (!nuevoCli.nombre || !nuevoCli.apellido) { alert('Nombre y apellido son requeridos.'); return; }
+    if (!nuevoCli.nombre || !nuevoCli.apellido) { await avisar('Nombre y apellido son requeridos.'); return; }
     const res = await window.api.clientes.crearRapido(nuevoCli);
-    if (!res.ok) { alert(res.error); return; }
+    if (!res.ok) { await avisar(res.error); return; }
     setCliente(res);
     setNuevoCliOpen(false);
     setNuevoCli({ nombre: '', apellido: '', telefono: '' });

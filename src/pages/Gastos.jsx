@@ -3,12 +3,14 @@ import Modal from '../components/Modal.jsx';
 import { money } from '../format.js';
 import { useAuth } from '../App.jsx';
 import { useFormConfirm } from '../hooks/useFormConfirm.js';
+import { useConfirm } from '../components/ConfirmProvider.jsx';
 
 const CATEGORIAS = { general: 'General', renta: 'Renta', servicios: 'Servicios', nomina: 'Nómina', proveedores: 'Proveedores', transporte: 'Transporte', mantenimiento: 'Mantenimiento', marketing: 'Marketing', otros: 'Otros' };
 const emptyForm = { id: 0, concepto: '', monto: '', categoria: 'general', forma_pago: 'efectivo', fecha: new Date().toISOString().slice(0, 10), proveedor: '', notas: '' };
 
 export default function Gastos() {
   const { user } = useAuth();
+  const { confirmar } = useConfirm();
   const [mes, setMes] = useState(new Date().toISOString().slice(0, 7));
   const [cat, setCat] = useState('');
   const [gastos, setGastos] = useState([]);
@@ -41,7 +43,7 @@ export default function Gastos() {
     setModalOpen(false);
     load();
   }
-  async function del(id) { if (!confirm('¿Eliminar este gasto?')) return; await window.api.gastos.delete({ id }); load(); }
+  async function del(id) { if (!(await confirmar('¿Eliminar este gasto?'))) return; await window.api.gastos.delete({ id }); load(); }
 
   return (
     <div>

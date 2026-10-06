@@ -3,11 +3,13 @@ import Modal from '../components/Modal.jsx';
 import { useAuth } from '../App.jsx';
 import { money } from '../format.js';
 import { useFormConfirm } from '../hooks/useFormConfirm.js';
+import { useConfirm } from '../components/ConfirmProvider.jsx';
 
 const emptyForm = { id: 0, nombre: '', codigo: '', tipo: 'porcentaje', valor: '', departamento: 'todos', categoria_id: '', producto_id: '', fecha_inicio: '', fecha_fin: '', activo: 1 };
 
 export default function Promociones() {
   const { user } = useAuth();
+  const { confirmar } = useConfirm();
   const esAdmin = user.rol === 'admin';
   const [rows, setRows] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
@@ -34,7 +36,7 @@ export default function Promociones() {
     load();
   }
   async function toggle(id) { await window.api.promociones.toggle({ id }); load(); }
-  async function del(id) { if (!confirm('¿Eliminar esta promoción?')) return; await window.api.promociones.delete({ id }); load(); }
+  async function del(id) { if (!(await confirmar('¿Eliminar esta promoción?'))) return; await window.api.promociones.delete({ id }); load(); }
 
   return (
     <div>

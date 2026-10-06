@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import Modal from '../components/Modal.jsx';
 import { useFormConfirm } from '../hooks/useFormConfirm.js';
+import { useConfirm } from '../components/ConfirmProvider.jsx';
 
 const emptyForm = { id: 0, nombre: '', contacto: '', telefono: '', email: '', notas: '' };
 
 export default function Proveedores() {
+  const { confirmar, avisar } = useConfirm();
   const [data, setData] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
@@ -35,9 +37,9 @@ export default function Proveedores() {
 
   async function toggle(id) { await window.api.proveedores.toggle({ id }); load(); }
   async function del(id) {
-    if (!confirm('¿Eliminar este proveedor?')) return;
+    if (!(await confirmar('¿Eliminar este proveedor?'))) return;
     const res = await window.api.proveedores.delete({ id });
-    if (!res.ok) alert(res.error);
+    if (!res.ok) await avisar(res.error);
     load();
   }
 

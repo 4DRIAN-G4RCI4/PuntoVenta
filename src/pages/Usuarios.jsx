@@ -2,11 +2,13 @@ import React, { useEffect, useState } from 'react';
 import Modal from '../components/Modal.jsx';
 import { useAuth } from '../App.jsx';
 import { useFormConfirm } from '../hooks/useFormConfirm.js';
+import { useConfirm } from '../components/ConfirmProvider.jsx';
 
 const emptyForm = { id: 0, nombre: '', email: '', rol: 'vendedor', activo: 1, password: '' };
 
 export default function Usuarios() {
   const { user } = useAuth();
+  const { confirmar, avisar } = useConfirm();
   const [rows, setRows] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
@@ -36,9 +38,9 @@ export default function Usuarios() {
     load();
   }
   async function del(id) {
-    if (!confirm('¿Eliminar usuario?')) return;
+    if (!(await confirmar('¿Eliminar usuario?'))) return;
     const res = await window.api.usuarios.delete({ id, currentUserId: user.id });
-    if (!res.ok) alert(res.error);
+    if (!res.ok) await avisar(res.error);
     load();
   }
 

@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { ACENTOS, useAcento } from '../hooks/useAcento.js';
 import Modal from '../components/Modal.jsx';
+import { useConfirm } from '../components/ConfirmProvider.jsx';
 
 export default function Configuracion() {
+  const { confirmar } = useConfirm();
   const [acento, setAcento] = useAcento();
 
   const [dbPath, setDbPath] = useState('');
@@ -124,7 +126,7 @@ export default function Configuracion() {
   }
 
   async function desconectarSync() {
-    if (!confirm('¿Desconectar la sincronización con la nube? La app móvil dejará de recibir información nueva.')) return;
+    if (!(await confirmar('¿Desconectar la sincronización con la nube? La app móvil dejará de recibir información nueva.'))) return;
     await window.api.sync.desconectar();
     setSyncMsg('');
     cargarEstadoSync();
@@ -141,7 +143,7 @@ export default function Configuracion() {
   }
 
   async function reenviarTodoElHistorico() {
-    if (!confirm('Esto vuelve a subir a Supabase TODAS las ventas, gastos y alertas de stock que ya existen localmente. Puede tardar unos minutos si tienes muchos registros. ¿Continuar?')) return;
+    if (!(await confirmar('Esto vuelve a subir a Supabase TODAS las ventas, gastos y alertas de stock que ya existen localmente. Puede tardar unos minutos si tienes muchos registros.', '¿Continuar?'))) return;
     setReenviandoTodo(true);
     setSyncMsg('');
     setProgreso({ total: 0, enviados: 0, restantes: 0 });
@@ -205,7 +207,7 @@ export default function Configuracion() {
   }
 
   async function importar() {
-    if (!confirm('Esto reemplazará la base de datos actual con el archivo seleccionado. Esta acción no se puede deshacer. ¿Continuar?')) return;
+    if (!(await confirmar('Esto reemplazará la base de datos actual con el archivo seleccionado. Esta acción no se puede deshacer.', '¿Continuar?'))) return;
     setMsg('');
     const res = await window.api.config.importDb();
     if (res.ok) {

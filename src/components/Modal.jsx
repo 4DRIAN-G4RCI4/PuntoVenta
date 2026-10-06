@@ -4,9 +4,10 @@ export default function Modal({ open, onClose, title, children, footer, maxWidth
   if (!open) return null;
   // confirmarCierre (opcional): si existe, se le pregunta antes de cerrar por clic
   // afuera o la X — así un formulario a medio llenar no se pierde por un clic
-  // accidental. Debe devolver true para proceder con el cierre.
-  function intentarCerrar() {
-    if (!confirmarCierre || confirmarCierre()) onClose();
+  // accidental. Debe devolver (o resolver a) true para proceder con el cierre;
+  // puede ser async si usa el modal propio de confirmación en vez de uno nativo.
+  async function intentarCerrar() {
+    if (!confirmarCierre || (await confirmarCierre())) onClose();
   }
   return (
     <div className="modal-overlay open" onClick={(e) => { if (e.target === e.currentTarget) intentarCerrar(); }}>

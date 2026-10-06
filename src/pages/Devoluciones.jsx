@@ -3,9 +3,11 @@ import Modal from '../components/Modal.jsx';
 import { money, dateFmt } from '../format.js';
 import { useAuth } from '../App.jsx';
 import { useFormConfirm } from '../hooks/useFormConfirm.js';
+import { useConfirm } from '../components/ConfirmProvider.jsx';
 
 export default function Devoluciones() {
   const { user } = useAuth();
+  const { confirmar } = useConfirm();
   const [mes, setMes] = useState(new Date().toISOString().slice(0, 7));
   const [rows, setRows] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
@@ -56,7 +58,7 @@ export default function Devoluciones() {
     load();
   }
 
-  async function del(id) { if (!confirm('¿Eliminar este registro?')) return; await window.api.devoluciones.delete({ id }); load(); }
+  async function del(id) { if (!(await confirmar('¿Eliminar este registro?'))) return; await window.api.devoluciones.delete({ id }); load(); }
 
   return (
     <div>

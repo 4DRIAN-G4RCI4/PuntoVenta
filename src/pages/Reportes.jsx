@@ -3,6 +3,7 @@ import { useAuth } from '../App.jsx';
 import { money, dateFmt, todayISO, firstDayOfMonthISO } from '../format.js';
 import { exportarCSV } from '../utils/csv.js';
 import { exportarPDF } from '../utils/pdf.js';
+import { useConfirm } from '../components/ConfirmProvider.jsx';
 
 const TITULOS = {
   financiero: 'Reporte Financiero',
@@ -35,6 +36,7 @@ function enRango(fechaISO, fi, ff) {
 
 export default function Reportes() {
   const { negocio } = useAuth();
+  const { avisar } = useConfirm();
   const [fi, setFi] = useState(firstDayOfMonthISO());
   const [ff, setFf] = useState(todayISO());
   const [tab, setTab] = useState('financiero');
@@ -274,7 +276,7 @@ export default function Reportes() {
       resumen: m.resumen, columnas: m.columnas, filas: m.filas, negocio,
     });
     setExportandoPdf(false);
-    if (!r.ok && r.error && !r.error.includes('cancelada')) alert(r.error);
+    if (!r.ok && r.error && !r.error.includes('cancelada')) await avisar(r.error);
   }
 
   return (
