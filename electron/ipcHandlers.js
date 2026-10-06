@@ -24,6 +24,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 const bcrypt = require('bcryptjs');
+const { construirTicketEscPos, rasterLogo, ANCHOS } = require('./ticketEscpos');
+const { imprimirRaw } = require('./impresionRaw');
 const { getDb, getDbPath, reopenDatabase, generateFolio, generarLlaveRecuperacion } = require('./db');
 const sync = require('./supabaseSync');
 const { seleccionarLotesFEFO, aplicarDeducciones, reconciliarStockPresentacion, calcularReversionDevolucion } = require('./logicaFarmacia');
@@ -753,15 +755,20 @@ function register(mainWindow, actualizaciones = {}) {
     return db().prepare(sql).all(...params);
   }));
 
-  ipcMain.handle('ventas:detalle', proteger(ROLES.VENTAS, (event, { id } = {}) => {
-    if (!esEnteroValido(id, { min: 1 })) return err('Venta inválida.');
+  function detalleVenta(id) {
     const venta = db().prepare(`SELECT v.*, IFNULL(c.nombre,'') || ' ' || IFNULL(c.apellido,'') as cliente_nombre, c.telefono as cliente_tel, u.nombre as vendedor_nombre
       FROM ventas v LEFT JOIN clientes c ON c.id=v.cliente_id LEFT JOIN usuarios u ON u.id=v.usuario_id WHERE v.id=?`).get(id);
-    if (!venta) return err('Venta no encontrada.');
-    const items = db().prepare(`SELECT vd.*, p.nombre as prod_nombre, p.sku, t.presentacion FROM ventas_detalle vd
+    if (!venta) return null;
+    const items = db().prepare(`SELECT vd.*, p.nombre as prod_nombre, p.sku, p.iva, t.presentacion FROM ventas_detalle vd
       JOIN productos p ON p.id=vd.producto_id LEFT JOIN presentaciones t ON t.id=vd.presentacion_id WHERE vd.venta_id=?`).all(id);
     const pagos = db().prepare('SELECT * FROM pagos WHERE venta_id=? ORDER BY created_at ASC').all(id);
-    return ok({ venta, items, pagos });
+    return { venta, items, pagos };
+  }
+
+  ipcMain.handle('ventas:detalle', proteger(ROLES.VENTAS, (event, { id } = {}) => {
+    if (!esEnteroValido(id, { min: 1 })) return err('Venta inválida.');
+    const d = detalleVenta(id);
+    return d ? ok(d) : err('Venta no encontrada.');
   }));
 
   // ── CREDITO ──────────────────────────────────────────────────
@@ -1391,64 +1398,31 @@ function register(mainWindow, actualizaciones = {}) {
     } catch (e) { return err(e.message); }
   }));
 
-  const ANCHOS_PAPEL_MICRONES = { '58mm': 58000, '80mm': 80000 };
+  // Logo del negocio (dataURL) → imagen ESC/POS a ~32% del ancho del papel.
+  function logoParaTicket(dataUrl, ancho) {
+    let img = nativeImage.createFromDataURL(dataUrl);
+    if (img.isEmpty()) return null;
+    const objetivo = Math.round(ANCHOS[ancho].dots * 0.32);
+    if (img.getSize().width !== objetivo) img = img.resize({ width: objetivo, quality: 'best' });
+    const { width, height } = img.getSize();
+    return rasterLogo(img.toBitmap(), width, height, ancho);
+  }
 
-  ipcMain.handle('ticket:imprimir', proteger(ROLES.VENTAS, async (event, { html } = {}) => {
-    if (!esTextoValido(html, { min: 1, max: 2_000_000 })) return err('Contenido de ticket inválido.');
-    const cfg = db().prepare('SELECT impresora_ticket, ancho_papel FROM app_config WHERE id=1').get();
+  ipcMain.handle('ticket:imprimir', proteger(ROLES.VENTAS, async (event, { venta_id } = {}) => {
+    if (!esEnteroValido(venta_id, { min: 1 })) return err('Venta inválida.');
+    const cfg = db().prepare('SELECT impresora_ticket, ancho_papel, nombre_negocio, logo FROM app_config WHERE id=1').get();
     if (!cfg?.impresora_ticket) return err('No hay una impresora de tickets configurada. Ve a Configuración.');
-
-    const tmpHtml = path.join(os.tmpdir(), `pvp-ticket-${Date.now()}-${Math.random().toString(36).slice(2)}.html`);
-    const tmpPdf = tmpHtml.replace(/\.html$/, '.pdf');
-    let win = null;
-    let winPdf = null;
+    const d = detalleVenta(venta_id);
+    if (!d) return err('Venta no encontrada.');
+    const ancho = cfg.ancho_papel === '80mm' ? '80mm' : '58mm';
     try {
-      fs.writeFileSync(tmpHtml, html, 'utf-8');
-      win = new BrowserWindow({ show: false, webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false } });
-      await win.loadFile(tmpHtml);
-
-      // webContents.print() con pageSize en micrones deja que el DRIVER de la
-      // impresora decida dónde corta — en impresoras térmicas genéricas eso
-      // suele ignorar el alto pedido y cortar donde el driver cree que debe,
-      // partiendo el texto a la mitad. Generar primero un PDF con el alto
-      // real del ticket (printToPDF SÍ respeta el tamaño exacto que se le
-      // da, en pulgadas) e imprimir ESE PDF es el camino que de verdad
-      // corta justo donde termina el contenido, sin header/footer (por
-      // defecto displayHeaderFooter=false en printToPDF).
-      const anchoMm = cfg.ancho_papel === '58mm' ? 58 : 80;
-      const altoPx = await win.webContents.executeJavaScript('document.body.scrollHeight');
-      const altoMm = Math.max(30, Math.round((altoPx * 25.4) / 96) + 12); // px a mm a 96dpi + margen generoso
-      const pdfBuffer = await win.webContents.printToPDF({
-        printBackground: true,
-        displayHeaderFooter: false,
-        margins: { top: 0, bottom: 0, left: 0, right: 0 },
-        pageSize: { width: anchoMm / 25.4, height: altoMm / 25.4 } // mm a pulgadas
-      });
-      fs.writeFileSync(tmpPdf, pdfBuffer);
-
-      winPdf = new BrowserWindow({ show: false, webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, plugins: true } });
-      await winPdf.loadURL(`file://${tmpPdf.replace(/\\/g, '/')}`);
-
-      const resultado = await new Promise((resolve) => {
-        winPdf.webContents.print({
-          silent: true,
-          deviceName: cfg.impresora_ticket,
-          printBackground: true,
-          margins: { marginType: 'none' },
-          header: '',
-          footer: '',
-          pageSize: { width: ANCHOS_PAPEL_MICRONES[cfg.ancho_papel] || 80000, height: Math.round(altoMm * 1000) }
-        }, (success, errorType) => resolve({ success, errorType }));
-      });
-      if (!resultado.success) return err('No se pudo imprimir el ticket: ' + (resultado.errorType || 'error desconocido'));
-      return ok();
+      let logo = null;
+      if (cfg.logo) { try { logo = logoParaTicket(cfg.logo, ancho); } catch (e) { console.warn('[ticket] logo no utilizable', e); } }
+      const datos = construirTicketEscPos({ ...d, negocio: { nombre_negocio: cfg.nombre_negocio }, ancho, logo });
+      const error = await imprimirRaw(cfg.impresora_ticket, datos);
+      return error ? err('No se pudo imprimir el ticket: ' + error) : ok();
     } catch (e) {
       return err(e.message);
-    } finally {
-      if (win) win.destroy();
-      if (winPdf) winPdf.destroy();
-      try { fs.unlinkSync(tmpHtml); } catch (_e) {}
-      try { fs.unlinkSync(tmpPdf); } catch (_e) {}
     }
   }));
 }

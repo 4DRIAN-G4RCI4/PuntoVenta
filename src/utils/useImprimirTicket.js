@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { construirTicketHtml } from './ticketHtml.js';
 
 // Lógica de impresión de ticket, reutilizable donde se necesite (Ticket.jsx,
 // y la vista previa que aparece justo al terminar de cobrar en Ventas).
@@ -16,8 +15,7 @@ export function useImprimirTicket({ venta, items, pagos, negocio }) {
     setMsgImpresion('');
     if (impresion?.impresora_ticket) {
       setImprimiendo(true);
-      const html = construirTicketHtml({ venta, items, pagos, negocio, ancho: impresion.ancho_papel });
-      const res = await window.api.ticket.imprimir({ html });
+      const res = await window.api.ticket.imprimir({ venta_id: venta.id });
       setImprimiendo(false);
       if (!res.ok) {
         setMsgImpresion(res.error + ' Se abrirá el diálogo de impresión normal.');

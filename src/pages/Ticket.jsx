@@ -2,71 +2,105 @@ import React, { useEffect, useState } from 'react';
 import { money, dateFmt } from '../format.js';
 import { useImprimirTicket } from '../utils/useImprimirTicket.js';
 
-const ESTADOS = { pagada: 'Pagada', pendiente: 'Pendiente', credito: 'Crédito', a_meses: 'A Meses', devuelta: 'Devuelta', cancelada: 'Cancelada' };
-const TIPOS = { contado: 'Contado', credito: 'Crédito', a_meses: 'A Meses' };
+const TIPOS = { contado: 'Contado', credito: 'Crédito', a_meses: 'A meses' };
+const FORMAS_PAGO = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', transferencia: 'Transferencia', mixto: 'Mixto' };
+const AVISOS = [
+  'Cualquier duda o aclaración, presente su ticket.',
+  'No se aceptan devoluciones de productos abiertos.',
+  'Consulte términos y condiciones.',
+  'Consulte promociones en tienda.',
+  'Este ticket no es un comprobante fiscal.'
+];
 
-// Solo el contenido visual del ticket (estilo recibo, fondo blanco) — sin
-// modal ni botones, para poder reutilizarlo tanto en el visor de Historial
-// de Ventas como en la vista previa que aparece justo al terminar de cobrar.
+// Mismo cálculo que el ticket impreso (electron/ticketEscpos.js): IVA incluido,
+// con el descuento de la venta repartido entre los productos.
+function desgloseIva(venta, items) {
+  const factor = venta.subtotal > 0 ? venta.total / venta.subtotal : 1;
+  let iva = 0, exento = 0;
+  for (const it of items) {
+    const importe = it.cantidad * it.precio_unitario * factor;
+    const tasa = Number(it.iva ?? 16);
+    if (tasa > 0) iva += importe - importe / (1 + tasa / 100);
+    else exento += importe;
+  }
+  return { iva, exento };
+}
+
+const fila = { display: 'flex', justifyContent: 'space-between', gap: 8 };
+
+function Fila({ izq, der, estilo }) {
+  return <div style={{ ...fila, ...estilo }}><span>{izq}</span><span style={{ whiteSpace: 'nowrap' }}>{der}</span></div>;
+}
+
+// Vista en pantalla del ticket, con el mismo diseño que sale en la impresora
+// térmica — se usa en Historial de Ventas y en la vista previa al cobrar.
 export function TicketContenido({ venta, items, pagos, negocio }) {
+  const { iva, exento } = desgloseIva(venta, items);
+  const articulos = items.reduce((s, it) => s + Number(it.cantidad || 0), 0);
   return (
-    <div style={{ color: '#1a1a2e' }}>
-      <div style={{ textAlign: 'center', borderBottom: '2px dashed #e5e7eb', paddingBottom: 14, marginBottom: 14 }}>
-        {negocio?.logo && <img src={negocio.logo} alt="" style={{ width: 40, height: 40, borderRadius: 8, objectFit: 'cover', marginBottom: 6 }} />}
-        <div style={{ fontSize: 22, fontWeight: 800 }}>Punto<span style={{ color: '#2563eb' }}>Venta</span></div>
-        <div style={{ fontSize: 11, color: '#6b7280', textTransform: 'uppercase' }}>{negocio?.nombre_negocio || 'Poblano'}</div>
-        <div style={{ marginTop: 8, fontSize: 13 }}>Folio: <strong>{venta.folio}</strong></div>
-        <span style={{ display: 'inline-block', marginTop: 6, padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: '#dbeafe', color: '#2563eb' }}>{ESTADOS[venta.estado] || venta.estado}</span>
+    <div style={{ color: '#111', fontFamily: "Consolas, 'Courier New', monospace", fontSize: 13, lineHeight: 1.35, maxWidth: '34ch', margin: '0 auto' }}>
+      <div style={{ textAlign: 'center' }}>
+        {negocio?.logo && <img src={negocio.logo} alt="" style={{ width: 64, height: 64, objectFit: 'contain', filter: 'grayscale(1)' }} />}
+        <div style={{ fontWeight: 800, fontSize: 18 }}>{negocio?.nombre_negocio || 'Punto de Venta'}</div>
+        <div>Folio: {venta.folio}</div>
+        <div>Fecha: {dateFmt(venta.created_at)}</div>
+        <div>Cliente: {venta.cliente_nombre?.trim() || 'Venta al público'}</div>
+        {venta.tipo_venta && venta.tipo_venta !== 'contado' && <div>Tipo: {TIPOS[venta.tipo_venta] || venta.tipo_venta}</div>}
+        {venta.vendedor_nombre && <div>Atendió: {venta.vendedor_nombre}</div>}
       </div>
 
-      <div style={{ fontSize: 12, marginBottom: 12 }}>
-        <div>Fecha: <strong>{dateFmt(venta.created_at)}</strong></div>
-        <div>Cliente: <strong>{venta.cliente_nombre?.trim() || 'Cliente general'}</strong></div>
-        <div>Tipo: <strong>{TIPOS[venta.tipo_venta] || venta.tipo_venta}</strong></div>
-        <div>Atendió: <strong>{venta.vendedor_nombre || '—'}</strong></div>
+      <div style={{ marginTop: 14 }}>
+        {items.map((it) => {
+          const nombre = `${it.cantidad}x ${it.prod_nombre}${it.presentacion ? ` (${it.presentacion})` : ''}`;
+          const importe = money(it.precio_unitario * it.cantidad);
+          return Number(it.cantidad) === 1
+            ? <Fila key={it.id} izq={nombre} der={importe} />
+            : (
+              <div key={it.id}>
+                <div>{nombre}</div>
+                <Fila izq={`${money(it.precio_unitario)} c/u`} der={importe} estilo={{ paddingLeft: '2ch' }} />
+              </div>
+            );
+        })}
       </div>
 
-      <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 8 }}>
-        {items.map((it) => (
-          <div key={it.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #e5e7eb', fontSize: 13 }}>
-            <div>
-              <div style={{ fontWeight: 600 }}>{it.prod_nombre}</div>
-              <div style={{ fontSize: 10, color: '#6b7280' }}>{it.presentacion ? `Presentacion: ${it.presentacion} · ` : ''}{it.cantidad} × {money(it.precio_unitario)}</div>
-            </div>
-            <div style={{ fontWeight: 700 }}>{money(it.precio_unitario * it.cantidad)}</div>
-          </div>
-        ))}
+      <div style={{ marginTop: 14 }}>
+        <div>Artículos: {articulos}</div>
+        <Fila izq="Subtotal:" der={money(venta.subtotal)} />
+        {venta.descuento_monto > 0 && <Fila izq="Descuento:" der={'-' + money(venta.descuento_monto)} />}
+        <Fila izq="TOTAL:" der={money(venta.total)} estilo={{ fontWeight: 800, fontSize: 18 }} />
+        {iva > 0 && <Fila izq="IVA incluido (16%):" der={money(iva)} />}
+        {exento > 0 && <Fila izq="Exento de IVA (0%):" der={money(exento)} />}
+        <Fila izq="Forma de pago:" der={FORMAS_PAGO[venta.forma_pago] || venta.forma_pago || 'Efectivo'} />
+        {venta.monto_pagado > 0 && <Fila izq="Pagado:" der={money(venta.monto_pagado)} />}
+        {venta.monto_pagado > venta.total && <Fila izq="Cambio:" der={money(venta.monto_pagado - venta.total)} />}
+        {venta.saldo_pendiente > 0 && <Fila izq="Saldo pendiente:" der={money(venta.saldo_pendiente)} />}
+        {venta.descuento_monto > 0 && <div style={{ textAlign: 'center', fontWeight: 700, marginTop: 10 }}>¡Usted ahorró {money(venta.descuento_monto)}!</div>}
       </div>
 
       {venta.tipo_venta === 'a_meses' && venta.num_meses > 0 && (
-        <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 8, padding: 10, margin: '10px 0', fontSize: 12 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Plan:</span><span>{venta.num_meses} meses</span></div>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Enganche:</span><span>{money(venta.enganche)}</span></div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}><span>Cuota mensual:</span><span>{money(venta.cuota_mensual)}</span></div>
+        <div style={{ marginTop: 14 }}>
+          <Fila izq="Plan:" der={`${venta.num_meses} meses`} />
+          <Fila izq="Enganche:" der={money(venta.enganche)} />
+          <Fila izq="Cuota mensual:" der={money(venta.cuota_mensual)} />
         </div>
       )}
-
-      <div style={{ borderTop: '2px dashed #e5e7eb', marginTop: 12, paddingTop: 12 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}><span>Subtotal</span><span>{money(venta.subtotal)}</span></div>
-        {venta.descuento_monto > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', color: '#ef4444', fontSize: 13 }}><span>Descuento</span><span>-{money(venta.descuento_monto)}</span></div>}
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 20, fontWeight: 800, marginTop: 8, borderTop: '1px solid #e5e7eb', paddingTop: 8 }}><span>TOTAL</span><span style={{ color: '#2563eb' }}>{money(venta.total)}</span></div>
-        {venta.monto_pagado > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', color: '#22c55e', fontSize: 13 }}><span>Pagado</span><span>{money(venta.monto_pagado)}</span></div>}
-        {venta.saldo_pendiente > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', color: '#ef4444', fontSize: 13 }}><span>Saldo pendiente</span><span>{money(venta.saldo_pendiente)}</span></div>}
-      </div>
 
       {pagos?.length > 0 && (
-        <div style={{ marginTop: 10, borderTop: '1px dashed #e5e7eb', paddingTop: 10 }}>
-          <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: '#6b7280', marginBottom: 6 }}>Pagos registrados</div>
-          {pagos.map((p, i) => (
-            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#6b7280' }}>
-              <span>{dateFmt(p.created_at)} — {p.forma_pago}</span><span style={{ color: '#22c55e', fontWeight: 600 }}>{money(p.monto)}</span>
-            </div>
-          ))}
+        <div style={{ marginTop: 14 }}>
+          <div>Pagos registrados:</div>
+          {pagos.map((p, i) => <Fila key={i} izq={`${dateFmt(p.created_at)} ${p.forma_pago}`} der={money(p.monto)} />)}
         </div>
       )}
 
-      <div style={{ textAlign: 'center', marginTop: 18, paddingTop: 14, borderTop: '2px dashed #e5e7eb', fontSize: 11, color: '#6b7280' }}>
-        ¡Gracias por su compra! Conserve su ticket para cambios y devoluciones.
+      <div style={{ textAlign: 'center', marginTop: 14 }}>
+        <div>¡Gracias por su compra!</div>
+        <div>Vuelva pronto</div>
+        <div style={{ fontSize: 11, marginTop: 12, color: '#333' }}>
+          {AVISOS.map((a) => <div key={a}>{a}</div>)}
+          <div style={{ marginTop: 8 }}>Desarrollado por Tecnopriv</div>
+          <div>Punto de Venta</div>
+        </div>
       </div>
     </div>
   );
