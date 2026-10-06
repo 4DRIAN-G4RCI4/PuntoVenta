@@ -1404,13 +1404,21 @@ function register(mainWindow, actualizaciones = {}) {
       fs.writeFileSync(tmpHtml, html, 'utf-8');
       win = new BrowserWindow({ show: false, webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false } });
       await win.loadFile(tmpHtml);
+      // Mide el alto real del ticket para que la impresora de rollo continuo
+      // corte justo ahí — un alto fijo (ej. tamaño carta) deja medio rollo en
+      // blanco en tickets cortos. 1mm = 1000 micrones; se añade un margen
+      // pequeño para no cortar la última línea.
+      const altoPx = await win.webContents.executeJavaScript('document.body.scrollHeight');
+      const altoMicrones = Math.max(40000, Math.round(altoPx * 264.6) + 4000); // 264.6 micrones/px a 96dpi
       const resultado = await new Promise((resolve) => {
         win.webContents.print({
           silent: true,
           deviceName: cfg.impresora_ticket,
           printBackground: true,
           margins: { marginType: 'none' },
-          pageSize: { width: ANCHOS_PAPEL_MICRONES[cfg.ancho_papel] || 80000, height: 297000 }
+          header: '',
+          footer: '',
+          pageSize: { width: ANCHOS_PAPEL_MICRONES[cfg.ancho_papel] || 80000, height: altoMicrones }
         }, (success, errorType) => resolve({ success, errorType }));
       });
       if (!resultado.success) return err('No se pudo imprimir el ticket: ' + (resultado.errorType || 'error desconocido'));
