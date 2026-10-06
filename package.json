@@ -1,6 +1,6 @@
 {
   "name": "punto-venta-poblano",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Punto de Venta de escritorio (Electron + React + SQLite)",
   "main": "electron/main.js",
   "author": "Punto Family",
