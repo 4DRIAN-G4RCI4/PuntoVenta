@@ -1399,26 +1399,45 @@ function register(mainWindow, actualizaciones = {}) {
     if (!cfg?.impresora_ticket) return err('No hay una impresora de tickets configurada. Ve a Configuración.');
 
     const tmpHtml = path.join(os.tmpdir(), `pvp-ticket-${Date.now()}-${Math.random().toString(36).slice(2)}.html`);
+    const tmpPdf = tmpHtml.replace(/\.html$/, '.pdf');
     let win = null;
+    let winPdf = null;
     try {
       fs.writeFileSync(tmpHtml, html, 'utf-8');
       win = new BrowserWindow({ show: false, webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false } });
       await win.loadFile(tmpHtml);
-      // Mide el alto real del ticket para que la impresora de rollo continuo
-      // corte justo ahí — un alto fijo (ej. tamaño carta) deja medio rollo en
-      // blanco en tickets cortos. 1mm = 1000 micrones; se añade un margen
-      // pequeño para no cortar la última línea.
+
+      // webContents.print() con pageSize en micrones deja que el DRIVER de la
+      // impresora decida dónde corta — en impresoras térmicas genéricas eso
+      // suele ignorar el alto pedido y cortar donde el driver cree que debe,
+      // partiendo el texto a la mitad. Generar primero un PDF con el alto
+      // real del ticket (printToPDF SÍ respeta el tamaño exacto que se le
+      // da, en pulgadas) e imprimir ESE PDF es el camino que de verdad
+      // corta justo donde termina el contenido, sin header/footer (por
+      // defecto displayHeaderFooter=false en printToPDF).
+      const anchoMm = cfg.ancho_papel === '58mm' ? 58 : 80;
       const altoPx = await win.webContents.executeJavaScript('document.body.scrollHeight');
-      const altoMicrones = Math.max(40000, Math.round(altoPx * 264.6) + 4000); // 264.6 micrones/px a 96dpi
+      const altoMm = Math.max(30, Math.round((altoPx * 25.4) / 96) + 12); // px a mm a 96dpi + margen generoso
+      const pdfBuffer = await win.webContents.printToPDF({
+        printBackground: true,
+        displayHeaderFooter: false,
+        margins: { top: 0, bottom: 0, left: 0, right: 0 },
+        pageSize: { width: anchoMm / 25.4, height: altoMm / 25.4 } // mm a pulgadas
+      });
+      fs.writeFileSync(tmpPdf, pdfBuffer);
+
+      winPdf = new BrowserWindow({ show: false, webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, plugins: true } });
+      await winPdf.loadURL(`file://${tmpPdf.replace(/\\/g, '/')}`);
+
       const resultado = await new Promise((resolve) => {
-        win.webContents.print({
+        winPdf.webContents.print({
           silent: true,
           deviceName: cfg.impresora_ticket,
           printBackground: true,
           margins: { marginType: 'none' },
           header: '',
           footer: '',
-          pageSize: { width: ANCHOS_PAPEL_MICRONES[cfg.ancho_papel] || 80000, height: altoMicrones }
+          pageSize: { width: ANCHOS_PAPEL_MICRONES[cfg.ancho_papel] || 80000, height: Math.round(altoMm * 1000) }
         }, (success, errorType) => resolve({ success, errorType }));
       });
       if (!resultado.success) return err('No se pudo imprimir el ticket: ' + (resultado.errorType || 'error desconocido'));
@@ -1427,7 +1446,9 @@ function register(mainWindow, actualizaciones = {}) {
       return err(e.message);
     } finally {
       if (win) win.destroy();
+      if (winPdf) winPdf.destroy();
       try { fs.unlinkSync(tmpHtml); } catch (_e) {}
+      try { fs.unlinkSync(tmpPdf); } catch (_e) {}
     }
   }));
 }

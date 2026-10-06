@@ -15,18 +15,17 @@ export function construirTicketHtml({ venta, items, pagos, negocio, ancho = '80m
   const filas = items.map((it) => `
     <div class="fila">
       <div class="nombre">${esc(it.prod_nombre)}</div>
-      <div class="detalle">${it.presentacion ? `Presentacion: ${esc(it.presentacion)} · ` : ''}${it.cantidad} x ${money(it.precio_unitario)}</div>
-      <div class="importe">${money(it.precio_unitario * it.cantidad)}</div>
+      <div class="linea"><span>${it.presentacion ? `${esc(it.presentacion)} · ` : ''}${it.cantidad} x ${money(it.precio_unitario)}</span><span>${money(it.precio_unitario * it.cantidad)}</span></div>
     </div>`).join('');
 
   const pagosHtml = (pagos || []).length ? `
-    <div class="sep"></div>
-    <div class="titulo">Pagos registrados</div>
+    <div class="espacio"></div>
+    <div><strong>Pagos registrados</strong></div>
     ${pagos.map((p) => `<div class="linea"><span>${dateFmt(p.created_at)} — ${esc(p.forma_pago)}</span><span>${money(p.monto)}</span></div>`).join('')}
   ` : '';
 
   const planHtml = (venta.tipo_venta === 'a_meses' && venta.num_meses > 0) ? `
-    <div class="sep"></div>
+    <div class="espacio"></div>
     <div class="linea"><span>Plan:</span><span>${venta.num_meses} meses</span></div>
     <div class="linea"><span>Enganche:</span><span>${money(venta.enganche)}</span></div>
     <div class="linea"><span>Cuota mensual:</span><span>${money(venta.cuota_mensual)}</span></div>
@@ -40,43 +39,39 @@ export function construirTicketHtml({ venta, items, pagos, negocio, ancho = '80m
 <style>
   @page { size: ${widthMm}mm auto; margin: 0; }
   * { box-sizing: border-box; }
-  body { width: ${widthMm}mm; margin: 0; padding: 2mm 3mm; font-family: 'Consolas', 'Courier New', monospace; font-size: 11px; color: #000; }
+  body { width: ${widthMm}mm; margin: 0; padding: 3mm 3mm 12mm; font-family: 'Consolas', 'Courier New', monospace; font-size: 11px; color: #000; line-height: 1.5; }
   .centro { text-align: center; }
-  .marca { font-size: 15px; font-weight: 800; }
-  .sub { font-size: 10px; text-transform: uppercase; color: #333; }
-  .sep { border-top: 1px dashed #000; margin: 6px 0; }
+  .marca { font-size: 14px; font-weight: 800; margin-top: 2px; }
+  .sub { font-size: 10px; margin-top: 2px; }
+  .espacio { margin-top: 10px; }
   .linea { display: flex; justify-content: space-between; padding: 1px 0; }
-  .fila { padding: 3px 0; border-bottom: 1px dotted #999; }
+  .fila { margin: 6px 0; }
   .fila .nombre { font-weight: 700; }
-  .fila .detalle { font-size: 10px; color: #333; display: flex; justify-content: space-between; }
-  .fila .importe { text-align: right; font-weight: 700; }
-  .titulo { font-size: 10px; font-weight: 700; text-transform: uppercase; margin-bottom: 2px; }
-  .total { display: flex; justify-content: space-between; font-size: 15px; font-weight: 800; margin-top: 4px; }
-  .pie { text-align: center; font-size: 10px; margin-top: 8px; }
-  .badge { display: inline-block; margin-top: 4px; padding: 1px 6px; border: 1px solid #000; font-size: 10px; }
+  .total { display: flex; justify-content: space-between; font-size: 14px; font-weight: 800; margin-top: 6px; }
+  .pie { text-align: center; font-size: 10px; margin-top: 14px; }
+  .badge { display: inline-block; margin-top: 6px; padding: 2px 8px; border: 1px solid #000; border-radius: 10px; font-size: 9px; }
 </style>
 </head>
 <body>
   <div class="centro">
-    ${negocio?.logo ? `<img src="${negocio.logo}" style="width:14mm;height:14mm;object-fit:cover;margin-bottom:2px;" />` : ''}
-    <div class="marca">PuntoVenta</div>
-    <div class="sub">${esc(negocio?.nombre_negocio || 'Poblano')}</div>
-    <div style="margin-top:4px;">Folio: <strong>${esc(venta.folio)}</strong></div>
+    ${negocio?.logo ? `<img src="${negocio.logo}" style="width:16mm;height:16mm;object-fit:cover;" />` : ''}
+    <div class="marca">${esc(negocio?.nombre_negocio || 'PuntoVenta Poblano')}</div>
+    <div class="sub">Folio: ${esc(venta.folio)}</div>
     <div class="badge">${esc(ESTADOS[venta.estado] || venta.estado)}</div>
   </div>
 
-  <div class="sep"></div>
+  <div class="espacio"></div>
   <div class="linea"><span>Fecha:</span><span>${dateFmt(venta.created_at)}</span></div>
   <div class="linea"><span>Cliente:</span><span>${esc(venta.cliente_nombre?.trim() || 'General')}</span></div>
   <div class="linea"><span>Tipo:</span><span>${esc(TIPOS[venta.tipo_venta] || venta.tipo_venta)}</span></div>
   <div class="linea"><span>Atendió:</span><span>${esc(venta.vendedor_nombre || '—')}</span></div>
 
-  <div class="sep"></div>
+  <div class="espacio"></div>
   ${filas}
 
   ${planHtml}
 
-  <div class="sep"></div>
+  <div class="espacio"></div>
   <div class="linea"><span>Subtotal</span><span>${money(venta.subtotal)}</span></div>
   ${venta.descuento_monto > 0 ? `<div class="linea"><span>Descuento</span><span>-${money(venta.descuento_monto)}</span></div>` : ''}
   <div class="total"><span>TOTAL</span><span>${money(venta.total)}</span></div>
@@ -85,7 +80,7 @@ export function construirTicketHtml({ venta, items, pagos, negocio, ancho = '80m
 
   ${pagosHtml}
 
-  <div class="pie">¡Gracias por su compra!<br/>Conserve su ticket para cambios y devoluciones.</div>
+  <div class="pie">¡Gracias por su compra! Vuelva pronto.</div>
 </body>
 </html>`;
 }
